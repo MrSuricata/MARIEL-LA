@@ -329,7 +329,7 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
           <div className={`hidden md:flex items-center space-x-8 ${!scrolled && location.pathname === '/' ? 'px-8 py-3 rounded-full backdrop-blur-[2px]' : ''}`}>
             <NavLink label="Inicio" to="/" />
             <NavLink label="Tienda" to="/catalogo" />
-            {/* <NavLink label="Historia" to="/historia" /> */}
+            {/* Historia hidden */}
             <NavLink label="Descubre" to="/blog" />
             <NavLink label="Ferias" to="/ferias" />
             <NavLink label="Contacto" to="#contacto" isAnchor={true} />
@@ -356,7 +356,7 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
         <div className="md:hidden absolute top-0 left-0 w-full h-screen bg-leather-50 flex flex-col items-center justify-center space-y-8 z-40">
             <Link to="/" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Inicio</Link>
             <Link to="/catalogo" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Tienda</Link>
-            {/* <Link to="/historia" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Historia</Link> */}
+            {/* Historia Hidden */}
             <Link to="/blog" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Descubre</Link>
             <Link to="/ferias" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Ferias</Link>
             <a href="#contacto" onClick={(e) => handleNavClick(e, '#contacto', true)} className="text-leather-900 font-bold text-xl">Contacto</a>
@@ -439,7 +439,7 @@ const HomePage = () => (
   <div className="animate-fade-in-up scroll-smooth">
     <HeroSection />
     <Reveal><FeaturedCarousel /></Reveal>
-    {/* <Reveal><HomeHistorySection /></Reveal> */}
+    {/* History Section Hidden */}
     <DiscoverSection />
     <Reveal><FairsTeaser /></Reveal>
     <Reveal><ContactSection /></Reveal>
@@ -597,7 +597,7 @@ const ContactSection = () => (
                  <div className="bg-[#25D366] p-1 rounded-full"><MessageCircle size={18} className="text-white fill-white" /></div> 
                  <span className="font-bold text-lg text-white">+598 98 766 318</span>
               </a>
-              <div className="flex items-center gap-4 group hover:bg-leather-800 p-2 -ml-2 rounded-lg transition-colors"><Mail size={20} className="text-blue-400" /> <span className="font-bold text-lg text-white">info@mariella.com.uy</span></div>
+              {/* Email Removed */}
               <a href="https://www.instagram.com/mariellacalistro/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 group cursor-pointer hover:bg-leather-800 p-2 -ml-2 rounded-lg transition-colors">
                  <div className="bg-gradient-to-tr from-yellow-500 via-red-500 to-purple-500 p-1 rounded-full"><Instagram size={18} className="text-white" /></div>
                  <span className="font-bold text-lg text-white">@mariellacalistro</span>
@@ -1144,15 +1144,15 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-leather-900 flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full">
+    <div className="min-h-screen bg-leather-50 flex items-center justify-center p-4">
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full border border-leather-100">
         <h1 className="text-2xl font-bold text-center mb-6 text-leather-900">Acceso Admin</h1>
         <input 
           style={{backgroundColor: 'white'}}
           type="password" 
           value={password} 
           onChange={e => { setPassword(e.target.value); setError(false); }} 
-          className="w-full !bg-white p-3 rounded-lg mb-4 focus:ring-2 focus:ring-leather-500 focus:outline-none border border-gray-300"
+          className="w-full !bg-white p-3 rounded-lg mb-4 focus:ring-2 focus:ring-leather-500 focus:outline-none border border-gray-300 text-leather-900"
           placeholder="Contraseña"
         />
         {error && <p className="text-red-500 text-sm mb-4 text-center font-bold">Contraseña incorrecta</p>}
@@ -1173,8 +1173,8 @@ const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
     });
     message += `\nTotal: ${currency} ${total}`;
     
-    // Using correct format for WhatsApp link: +598 99 511 196
-    const whatsappUrl = `https://wa.me/59899511196?text=${encodeURIComponent(message)}`;
+    // Using correct format for WhatsApp link: +598 98 766 318
+    const whatsappUrl = `https://wa.me/59898766318?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
@@ -1230,14 +1230,14 @@ const Footer = () => (
         <h4 className="text-white font-bold mb-4">Enlaces</h4>
         <ul className="space-y-2 text-sm font-medium">
           <li><Link to="/catalogo" className="hover:text-white transition">Tienda</Link></li>
-          {/* <li><Link to="/historia" className="hover:text-white transition">Historia</Link></li> */}
+          {/* History Link Removed */}
           <li><Link to="/blog" className="hover:text-white transition">Blog</Link></li>
         </ul>
       </div>
       <div>
         <h4 className="text-white font-bold mb-4">Contacto</h4>
         <ul className="space-y-2 text-sm font-medium">
-          <li>info@mariella.com.uy</li>
+          {/* Email Removed */}
           <li>+598 98 766 318</li>
           <li>Montevideo, Uruguay</li>
         </ul>
@@ -1246,7 +1246,6 @@ const Footer = () => (
         <h4 className="text-white font-bold mb-4">Síguenos</h4>
         <div className="flex gap-4">
           <a href="https://www.instagram.com/mariellacalistro/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition"><Instagram size={20} /></a>
-          <a href="#" className="hover:text-white transition"><Mail size={20} /></a>
         </div>
       </div>
     </div>
