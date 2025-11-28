@@ -266,6 +266,21 @@ const TopBar = () => (
   </div>
 );
 
+const FloatingWhatsApp = () => (
+  <a 
+    href="https://wa.me/59898766318" 
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="fixed bottom-6 right-6 z-40 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:bg-[#20bd5a] transition-all duration-300 hover:scale-110 flex items-center justify-center group"
+    aria-label="Contactar por WhatsApp"
+  >
+    <MessageCircle size={28} className="fill-white text-white" />
+    <span className="absolute right-full mr-3 bg-white text-leather-900 px-3 py-1 rounded-lg text-sm font-bold shadow-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+      ¡Escribinos!
+    </span>
+  </a>
+);
+
 const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
   const { cart, isAdmin } = useStore();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -435,57 +450,21 @@ const DiscoverSection = () => {
   );
 };
 
-const HomePage = () => (
-  <div className="animate-fade-in-up scroll-smooth">
-    <HeroSection />
-    <Reveal><FeaturedCarousel /></Reveal>
-    {/* History Section Hidden */}
-    <DiscoverSection />
-    <Reveal><FairsTeaser /></Reveal>
-    <Reveal><ContactSection /></Reveal>
-  </div>
-);
-
-// --- Sections Components (Refactored for Persistence) ---
-
-const HomeHistorySection = () => {
-  const { history } = useStore();
-  const displayHistory = history.slice(0, 3);
-
+const HomePage = () => {
+  useEffect(() => { document.title = "MARIEL'LA | Artesanía en Cuero"; }, []);
   return (
-    <section id="historia" className="py-24 relative overflow-hidden scroll-mt-20 bg-leather-900 text-white border-t border-leather-800">
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/dark-leather.png')] opacity-30 z-0"></div>
-      <div className="max-w-6xl mx-auto px-4 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-          <div className="order-2 md:order-1">
-             <span className="text-leather-400 uppercase tracking-widest text-xs font-bold">Nuestra Esencia</span>
-             <h2 className="text-4xl md:text-5xl font-serif font-bold text-white mt-2 mb-6 text-shadow-sm">Un Legado en Cuero</h2>
-             <div className="prose prose-lg text-leather-100 leading-relaxed mb-8">
-               <p>MARIEL'LA no es solo una marca, es la culminación de décadas de respeto por el oficio. Creemos que el verdadero lujo reside en el tiempo dedicado a cada costura.</p>
-             </div>
-             <div className="space-y-8 relative border-l-2 border-leather-600 ml-3 pl-8 py-2">
-               {displayHistory.map((m, i) => (
-                 <div key={i} className="relative">
-                   <div className="absolute -left-[41px] top-1 w-4 h-4 rounded-full bg-leather-600 border-4 border-leather-900"></div>
-                   <h4 className="text-xl font-serif font-bold text-white">{m.year} <span className="text-leather-500 font-sans text-sm font-normal mx-2">|</span> {m.title}</h4>
-                   <p className="text-sm text-leather-200 mt-1 line-clamp-2">{m.description}</p>
-                 </div>
-               ))}
-             </div>
-             <div className="mt-10">
-               <Link to="/historia" className="inline-flex items-center text-white font-bold border-b-2 border-white pb-1 hover:text-leather-300 hover:border-leather-300 transition-colors">Leer historia completa <ArrowRight size={18} className="ml-2"/></Link>
-             </div>
-          </div>
-          <div className="order-1 md:order-2 relative">
-             <div className="aspect-[4/5] rounded-lg overflow-hidden shadow-2xl rotate-2 hover:rotate-0 transition-transform duration-700 border-4 border-leather-800 bg-leather-800">
-               <img src="https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800" alt="Taller de cuero" className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity" />
-             </div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <div className="animate-fade-in-up scroll-smooth">
+      <HeroSection />
+      <Reveal><FeaturedCarousel /></Reveal>
+      {/* History Section Hidden */}
+      <DiscoverSection />
+      <Reveal><FairsTeaser /></Reveal>
+      <Reveal><ContactSection /></Reveal>
+    </div>
   );
 };
+
+// --- Sections Components ---
 
 const FeaturedCarousel = () => {
   const { products, currency } = useStore();
@@ -624,7 +603,12 @@ const BlogPage = () => {
   const { blogPosts } = useStore();
   const [selectedPost, setSelectedPost] = useState<string | null>(null);
 
-  useEffect(() => { window.scrollTo(0,0) }, []);
+  useEffect(() => { 
+    window.scrollTo(0,0);
+    document.title = selectedPost 
+      ? `${blogPosts.find(p=>p.id===selectedPost)?.title} - MARIEL'LA` 
+      : "Blog - MARIEL'LA"; 
+  }, [selectedPost, blogPosts]);
 
   if (selectedPost) {
     const post = blogPosts.find(p => p.id === selectedPost);
@@ -691,10 +675,22 @@ const ProductDetail = () => {
   const imgContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { window.scrollTo(0,0) }, [id]);
+  
   const product = products.find(p => p.id === id);
+  
+  // Dynamic Title
+  useEffect(() => {
+    if (product) document.title = `${product.name} - MARIEL'LA`;
+  }, [product]);
+
   if (!product) return <div className="text-center py-40">Producto no encontrado</div>;
   const currentImageUrl = processImageUrl(product.images[selectedImg], 1200);
   const highResImageUrl = processImageUrl(product.images[selectedImg], 2400);
+
+  // Related Products Logic
+  const relatedProducts = products
+    .filter(p => p.category === product.category && p.id !== product.id)
+    .slice(0, 3);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!imgContainerRef.current) return;
@@ -709,7 +705,7 @@ const ProductDetail = () => {
     <>
       <div className="bg-white min-h-screen pt-36 pb-12 animate-fade-in-up">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-24">
             <div className="space-y-6">
               <div ref={imgContainerRef} className={`relative aspect-square bg-leather-50 rounded-2xl overflow-hidden border border-leather-100 shadow-sm group ${showMagnifier ? 'cursor-none' : 'cursor-zoom-in'}`} onMouseEnter={() => setShowMagnifier(true)} onMouseLeave={() => setShowMagnifier(false)} onMouseMove={handleMouseMove} onClick={() => setIsLightboxOpen(true)}>
                 <img src={currentImageUrl} alt={product.name} className="w-full h-full object-cover" />
@@ -738,6 +734,26 @@ const ProductDetail = () => {
               <button onClick={() => addToCart(product)} className="w-full bg-leather-900 text-white px-8 py-5 rounded-lg font-bold text-lg hover:bg-leather-800 transition shadow-lg transform active:scale-95">Agregar al Carrito</button>
             </div>
           </div>
+          
+          {/* Related Products Section */}
+          {relatedProducts.length > 0 && (
+            <div className="border-t border-leather-100 pt-16">
+              <h2 className="text-2xl font-serif font-bold text-leather-900 mb-8">También te podría gustar</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {relatedProducts.map(rp => (
+                  <div key={rp.id} className="group">
+                    <Link to={`/producto/${rp.id}`} className="block">
+                      <div className="aspect-square rounded-xl overflow-hidden mb-4 border border-leather-100 shadow-sm">
+                        <img src={processImageUrl(rp.images[0], 600)} alt={rp.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      </div>
+                      <h3 className="font-bold text-leather-900 text-lg group-hover:text-leather-600 transition">{rp.name}</h3>
+                      <p className="text-leather-600 font-medium">{currency} {currency === 'UYU' ? rp.priceUYU : rp.priceUSD}</p>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       {isLightboxOpen && (
@@ -761,6 +777,8 @@ const AdminPanel = () => {
   const [newCategory, setNewCategory] = useState('');
   const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => { document.title = "Admin - MARIEL'LA"; }, []);
 
   const handleLogout = () => { logout(); navigate('/'); };
 
@@ -961,6 +979,11 @@ const CatalogPage = () => {
   const [filter, setFilter] = useState('Todas');
   const [searchTerm, setSearchTerm] = useState('');
 
+  useEffect(() => { 
+    window.scrollTo(0, 0); 
+    document.title = "Tienda - MARIEL'LA";
+  }, []);
+
   // Filter products by category AND search term (name or description)
   const filtered = products.filter(p => {
     const matchesCategory = filter === 'Todas' || p.category === filter;
@@ -969,8 +992,6 @@ const CatalogPage = () => {
       p.description.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
   });
-
-  useEffect(() => { window.scrollTo(0, 0); }, []);
 
   return (
     <div className="pt-36 pb-24 bg-leather-50 min-h-screen">
@@ -1031,6 +1052,7 @@ const CatalogPage = () => {
 
 const HistoryPage = () => {
   const { history } = useStore();
+  useEffect(() => { document.title = "Historia - MARIEL'LA"; }, []);
   return (
     <div className="pt-36 pb-24 bg-[#fdfbf7] min-h-screen relative">
       <div className="absolute inset-0 opacity-40 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] pointer-events-none"></div>
@@ -1083,6 +1105,7 @@ const FairsPage = () => {
   const { fairs } = useStore();
   const upcoming = fairs.filter(f => f.status === 'upcoming');
   const past = fairs.filter(f => f.status === 'past');
+  useEffect(() => { document.title = "Ferias - MARIEL'LA"; }, []);
 
   return (
     <div className="pt-36 pb-24 bg-white min-h-screen">
@@ -1133,6 +1156,7 @@ const LoginPage = () => {
   const [error, setError] = useState(false);
   const { login } = useStore();
   const navigate = useNavigate();
+  useEffect(() => { document.title = "Acceso Admin - MARIEL'LA"; }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1267,6 +1291,7 @@ const App = () => {
         <GlobalStyles />
         <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
         <Navbar toggleCart={toggleCart} />
+        <FloatingWhatsApp />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/catalogo" element={<CatalogPage />} />
