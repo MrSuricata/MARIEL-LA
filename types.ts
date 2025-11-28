@@ -4,7 +4,7 @@ export interface Product {
   description: string;
   priceUYU: number;
   priceUSD: number;
-  category: 'Carteras' | 'Billeteras' | 'Cintos' | 'Mochilas' | 'Accesorios';
+  category: string;
   images: string[];
   materials: string[];
   colors: string[];
