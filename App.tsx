@@ -7,12 +7,14 @@ import {
   ZoomIn, Maximize2, Truck, CreditCard, BookOpen, MessageCircle, Copy, Database, XCircle, Tag
 } from 'lucide-react';
 import { Product, CartItem, Fair, Currency, HistoryEvent, BlogPost } from './types';
-import { INITIAL_PRODUCTS, INITIAL_CATEGORIES } from './constants';
 import { StorageService } from './services/storageService';
+import { Upload } from 'lucide-react';
 
 // --- Utility: Image URL Processor ---
 const processImageUrl = (url: string, size: number = 800): string => {
   if (!url) return '';
+  // Supabase storage URLs pass through directly
+  if (url.includes('supabase.co/storage')) return url;
   let cleanUrl = url;
   if (url.includes('google.com/url?')) {
      const match = url.match(/q=([^&]+)/);
@@ -188,11 +190,21 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
-    setProducts(StorageService.getProducts());
-    setFairs(StorageService.getFairs());
-    setHistory(StorageService.getHistory());
-    setBlogPosts(StorageService.getBlogPosts());
-    setCategories(StorageService.getCategories());
+    const loadData = async () => {
+      const [prods, frs, hist, blogs, cats] = await Promise.all([
+        StorageService.getProducts(),
+        StorageService.getFairs(),
+        StorageService.getHistory(),
+        StorageService.getBlogPosts(),
+        StorageService.getCategories(),
+      ]);
+      setProducts(prods);
+      setFairs(frs);
+      setHistory(hist);
+      setBlogPosts(blogs);
+      setCategories(cats);
+    };
+    loadData();
     const savedCart = localStorage.getItem('mariella_cart');
     if (savedCart) setCart(JSON.parse(savedCart));
   }, []);
@@ -219,33 +231,31 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   };
   const logout = () => setIsAdmin(false);
 
-  const addProduct = (p: Product) => { const u = [...products, p]; setProducts(u); StorageService.saveProducts(u); };
-  const updateProduct = (p: Product) => { const u = products.map(x => x.id === p.id ? p : x); setProducts(u); StorageService.saveProducts(u); };
-  const deleteProduct = (id: string) => { const u = products.filter(x => x.id !== id); setProducts(u); StorageService.saveProducts(u); };
-  
-  const addFair = (f: Fair) => { const u = [...fairs, f]; setFairs(u); StorageService.saveFairs(u); };
-  const updateFair = (f: Fair) => { const u = fairs.map(x => x.id === f.id ? f : x); setFairs(u); StorageService.saveFairs(u); };
-  const deleteFair = (id: string) => { const u = fairs.filter(x => x.id !== id); setFairs(u); StorageService.saveFairs(u); };
+  const addProduct = async (p: Product) => { setProducts(prev => [...prev, p]); await StorageService.saveProduct(p); };
+  const updateProduct = async (p: Product) => { setProducts(prev => prev.map(x => x.id === p.id ? p : x)); await StorageService.saveProduct(p); };
+  const deleteProduct = async (id: string) => { setProducts(prev => prev.filter(x => x.id !== id)); await StorageService.deleteProduct(id); };
 
-  const addHistoryEvent = (h: HistoryEvent) => { const u = [...history, h]; setHistory(u); StorageService.saveHistory(u); };
-  const updateHistoryEvent = (h: HistoryEvent) => { const u = history.map(x => x.id === h.id ? h : x); setHistory(u); StorageService.saveHistory(u); };
-  const deleteHistoryEvent = (id: string) => { const u = history.filter(x => x.id !== id); setHistory(u); StorageService.saveHistory(u); };
+  const addFair = async (f: Fair) => { setFairs(prev => [...prev, f]); await StorageService.saveFair(f); };
+  const updateFair = async (f: Fair) => { setFairs(prev => prev.map(x => x.id === f.id ? f : x)); await StorageService.saveFair(f); };
+  const deleteFair = async (id: string) => { setFairs(prev => prev.filter(x => x.id !== id)); await StorageService.deleteFair(id); };
 
-  const addBlogPost = (b: BlogPost) => { const u = [...blogPosts, b]; setBlogPosts(u); StorageService.saveBlogPosts(u); };
-  const updateBlogPost = (b: BlogPost) => { const u = blogPosts.map(x => x.id === b.id ? b : x); setBlogPosts(u); StorageService.saveBlogPosts(u); };
-  const deleteBlogPost = (id: string) => { const u = blogPosts.filter(x => x.id !== id); setBlogPosts(u); StorageService.saveBlogPosts(u); };
+  const addHistoryEvent = async (h: HistoryEvent) => { setHistory(prev => [...prev, h]); await StorageService.saveHistoryEvent(h); };
+  const updateHistoryEvent = async (h: HistoryEvent) => { setHistory(prev => prev.map(x => x.id === h.id ? h : x)); await StorageService.saveHistoryEvent(h); };
+  const deleteHistoryEvent = async (id: string) => { setHistory(prev => prev.filter(x => x.id !== id)); await StorageService.deleteHistoryEvent(id); };
 
-  const addCategory = (c: string) => { 
+  const addBlogPost = async (b: BlogPost) => { setBlogPosts(prev => [...prev, b]); await StorageService.saveBlogPost(b); };
+  const updateBlogPost = async (b: BlogPost) => { setBlogPosts(prev => prev.map(x => x.id === b.id ? b : x)); await StorageService.saveBlogPost(b); };
+  const deleteBlogPost = async (id: string) => { setBlogPosts(prev => prev.filter(x => x.id !== id)); await StorageService.deleteBlogPost(id); };
+
+  const addCategory = async (c: string) => {
     if (!categories.includes(c)) {
-      const u = [...categories, c]; 
-      setCategories(u); 
-      StorageService.saveCategories(u); 
+      setCategories(prev => [...prev, c]);
+      await StorageService.addCategory(c);
     }
   };
-  const deleteCategory = (c: string) => { 
-    const u = categories.filter(cat => cat !== c); 
-    setCategories(u); 
-    StorageService.saveCategories(u); 
+  const deleteCategory = async (c: string) => {
+    setCategories(prev => prev.filter(cat => cat !== c));
+    await StorageService.deleteCategory(c);
   };
 
   return (
@@ -824,7 +834,33 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               <div><label className="text-xs font-bold text-leather-700 mb-1 block">UYU</label><input style={{backgroundColor: 'white'}} type="number" className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.priceUYU} onChange={e => setFormData({...formData, priceUYU: Number(e.target.value)})} /></div>
               <div><label className="text-xs font-bold text-leather-700 mb-1 block">USD</label><input style={{backgroundColor: 'white'}} type="number" className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.priceUSD} onChange={e => setFormData({...formData, priceUSD: Number(e.target.value)})} /></div>
             </div>
-            <div><label className="text-xs font-bold text-leather-700 mb-1 block">URLs Imágenes</label><textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-20 text-sm font-mono" value={Array.isArray(formData.images) ? formData.images.join('\n') : ''} onChange={e => setFormData({...formData, images: e.target.value.split('\n')})} /></div>
+            <div>
+              <label className="text-xs font-bold text-leather-700 mb-1 block">Subir Fotos desde PC</label>
+              <label className="flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-4 hover:border-leather-500 transition-colors">
+                <Upload size={20} className="text-leather-500" />
+                <span className="text-sm text-leather-600 font-medium">Click para seleccionar imágenes</span>
+                <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length === 0) return;
+                  try {
+                    const urls = await Promise.all(files.map(f => StorageService.uploadImage(f, 'products')));
+                    setFormData(prev => ({ ...prev, images: [...(prev.images || []).filter(i => i !== ''), ...urls] }));
+                  } catch (err) { console.error('Upload error:', err); alert('Error al subir imagen'); }
+                }} />
+              </label>
+              {formData.images && formData.images.filter(i => i).length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {formData.images.filter(i => i).map((img, idx) => (
+                    <div key={idx} className="relative group">
+                      <img src={processImageUrl(img, 100)} className="w-16 h-16 object-cover rounded border" alt="" />
+                      <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: (prev.images || []).filter((_, i) => i !== idx) }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <label className="text-xs text-leather-400 mt-2 block">O pega URLs directamente:</label>
+              <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm font-mono mt-1" value={Array.isArray(formData.images) ? formData.images.join('\n') : ''} onChange={e => setFormData({...formData, images: e.target.value.split('\n')})} />
+            </div>
             <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setEditingProduct(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
           </form>
       </div></div>
@@ -849,16 +885,16 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
           <div className="p-8">
             {activeTab === 'system' && (
               <div className="animate-fade-in max-w-2xl">
-                 <h2 className="text-2xl font-serif font-bold text-leather-900 mb-4">Persistencia de Datos</h2>
-                 <p className="text-leather-700 mb-6 leading-relaxed">
-                   Esta aplicación funciona localmente. Los cambios que has hecho (nuevos productos, ferias, categorías, etc.) están guardados solo en este navegador. 
-                   Para hacerlos permanentes para <b>todos los usuarios</b> que visiten la web, debes copiar los datos actuales y pegarlos en el archivo de código <code>constants.ts</code>.
-                 </p>
+                 <h2 className="text-2xl font-serif font-bold text-leather-900 mb-4">Estado del Sistema</h2>
+                 <div className="bg-green-50 p-6 rounded-xl border border-green-200 mb-6">
+                   <h3 className="font-bold text-green-800 mb-2 flex items-center gap-2"><CheckCircle size={20} className="text-green-600" /> Base de datos conectada</h3>
+                   <p className="text-green-700 text-sm">Los datos se guardan automáticamente en la nube (Supabase). Todos los cambios que hagas desde este panel son visibles inmediatamente para todos los visitantes de la web.</p>
+                 </div>
                  <div className="bg-leather-50 p-6 rounded-xl border border-leather-200">
-                   <h3 className="font-bold text-leather-900 mb-3 flex items-center gap-2"><Database size={20}/> Exportar Datos</h3>
-                   <p className="text-sm text-leather-600 mb-4">Haz clic en copiar y reemplaza el contenido de <code>constants.ts</code> con este código.</p>
+                   <h3 className="font-bold text-leather-900 mb-3 flex items-center gap-2"><Database size={20}/> Exportar Datos (Backup)</h3>
+                   <p className="text-sm text-leather-600 mb-4">Exportar una copia de seguridad de todos los datos actuales.</p>
                    <button onClick={copyToClipboard} className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-white transition-all ${copied ? 'bg-green-600' : 'bg-leather-900 hover:bg-leather-800'}`}>
-                      {copied ? <><CheckCircle size={20}/> ¡Copiado!</> : <><Copy size={20}/> Copiar Código JSON</>}
+                      {copied ? <><CheckCircle size={20}/> ¡Copiado!</> : <><Copy size={20}/> Copiar Backup JSON</>}
                    </button>
                  </div>
               </div>
@@ -919,6 +955,17 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Ubicación" value={editingFair.location || ''} onChange={e => setEditingFair({...editingFair, location: e.target.value})} />
                        <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-24" placeholder="Descripción" value={editingFair.description || ''} onChange={e => setEditingFair({...editingFair, description: e.target.value})} />
                        <select style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={editingFair.status || 'upcoming'} onChange={e => setEditingFair({...editingFair, status: e.target.value as any})}><option value="upcoming">Próxima</option><option value="past">Pasada</option></select>
+                       <div>
+                         <label className="text-xs font-bold text-leather-700 mb-1 block">Imagen</label>
+                         <label className="flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-3 hover:border-leather-500 transition-colors">
+                           <Upload size={18} className="text-leather-500" /><span className="text-sm text-leather-600">Subir foto</span>
+                           <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                             const file = e.target.files?.[0]; if (!file) return;
+                             try { const url = await StorageService.uploadImage(file, 'fairs'); setEditingFair({...editingFair, imageUrl: url}); } catch { alert('Error al subir'); }
+                           }} />
+                         </label>
+                         {editingFair.imageUrl && <img src={processImageUrl(editingFair.imageUrl, 100)} className="w-16 h-16 object-cover rounded mt-2" alt="" />}
+                       </div>
                        <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditingFair(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
                      </form>
                    </div></div>
@@ -941,7 +988,18 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                         <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Título" value={editingBlog.title || ''} onChange={e => setEditingBlog({...editingBlog, title: e.target.value})} />
                         <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-32" placeholder="Contenido" value={editingBlog.content || ''} onChange={e => setEditingBlog({...editingBlog, content: e.target.value})} />
                         <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Autor" value={editingBlog.author || ''} onChange={e => setEditingBlog({...editingBlog, author: e.target.value})} />
-                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="URL Imagen" value={editingBlog.imageUrl || ''} onChange={e => setEditingBlog({...editingBlog, imageUrl: e.target.value})} />
+                        <div>
+                          <label className="text-xs font-bold text-leather-700 mb-1 block">Imagen</label>
+                          <label className="flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-3 hover:border-leather-500 transition-colors">
+                            <Upload size={18} className="text-leather-500" /><span className="text-sm text-leather-600">Subir foto</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                              const file = e.target.files?.[0]; if (!file) return;
+                              try { const url = await StorageService.uploadImage(file, 'blog'); setEditingBlog({...editingBlog, imageUrl: url}); } catch { alert('Error al subir'); }
+                            }} />
+                          </label>
+                          {editingBlog.imageUrl && <img src={processImageUrl(editingBlog.imageUrl, 100)} className="w-16 h-16 object-cover rounded mt-2" alt="" />}
+                          <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none mt-2 text-sm" placeholder="O pegar URL de imagen" value={editingBlog.imageUrl || ''} onChange={e => setEditingBlog({...editingBlog, imageUrl: e.target.value})} />
+                        </div>
                         <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditingBlog(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
                       </form>
                     </div></div>

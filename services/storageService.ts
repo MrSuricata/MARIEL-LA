@@ -1,103 +1,214 @@
 import { Product, Fair, HistoryEvent, BlogPost } from '../types';
-import { INITIAL_PRODUCTS, INITIAL_FAIRS, INITIAL_HISTORY, INITIAL_BLOG_POSTS, INITIAL_CATEGORIES } from '../constants';
+import { supabase } from './supabaseClient';
 
-const DATA_VERSION = 'v2025_update_3'; // Incrementing this forces a data reset for all users
+// --- Mappers: DB snake_case <-> TS camelCase ---
 
-const KEYS = {
-  VERSION: 'mariella_version',
-  PRODUCTS: 'mariella_products',
-  FAIRS: 'mariella_fairs',
-  HISTORY: 'mariella_history',
-  BLOG: 'mariella_blog',
-  CART: 'mariella_cart',
-  CATEGORIES: 'mariella_categories'
-};
+function dbToProduct(row: any): Product {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    priceUYU: Number(row.price_uyu),
+    priceUSD: Number(row.price_usd),
+    category: row.category,
+    images: row.images || [],
+    materials: row.materials || [],
+    colors: row.colors || [],
+    dimensions: row.dimensions,
+    isFeatured: row.is_featured,
+  };
+}
 
-// Check version and reset if needed
-const checkVersion = () => {
-  const currentVersion = localStorage.getItem(KEYS.VERSION);
-  if (currentVersion !== DATA_VERSION) {
-    // Clear old data to ensure new content (products, blog, history) is loaded
-    localStorage.removeItem(KEYS.PRODUCTS);
-    localStorage.removeItem(KEYS.FAIRS);
-    localStorage.removeItem(KEYS.HISTORY);
-    localStorage.removeItem(KEYS.BLOG);
-    localStorage.removeItem(KEYS.CATEGORIES);
-    // Note: We keep the cart so users don't lose selections
-    localStorage.setItem(KEYS.VERSION, DATA_VERSION);
-    return false; // Data was reset
-  }
-  return true; // Data is up to date
-};
+function productToDb(p: Product): any {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price_uyu: p.priceUYU,
+    price_usd: p.priceUSD,
+    category: p.category,
+    images: p.images,
+    materials: Array.isArray(p.materials) ? p.materials : [],
+    colors: Array.isArray(p.colors) ? p.colors : [],
+    dimensions: p.dimensions,
+    is_featured: p.isFeatured,
+  };
+}
+
+function dbToFair(row: any): Fair {
+  return {
+    id: row.id,
+    name: row.name,
+    date: row.date,
+    city: row.city,
+    location: row.location,
+    description: row.description,
+    imageUrl: row.image_url || '',
+    mapsUrl: row.maps_url || '',
+    status: row.status,
+  };
+}
+
+function fairToDb(f: Fair): any {
+  return {
+    id: f.id,
+    name: f.name,
+    date: f.date,
+    city: f.city,
+    location: f.location,
+    description: f.description,
+    image_url: f.imageUrl,
+    maps_url: f.mapsUrl,
+    status: f.status,
+  };
+}
+
+function dbToHistory(row: any): HistoryEvent {
+  return {
+    id: row.id,
+    year: row.year,
+    title: row.title,
+    description: row.description,
+    imageUrl: row.image_url,
+  };
+}
+
+function historyToDb(h: HistoryEvent): any {
+  return {
+    id: h.id,
+    year: h.year,
+    title: h.title,
+    description: h.description,
+    image_url: h.imageUrl,
+  };
+}
+
+function dbToBlogPost(row: any): BlogPost {
+  return {
+    id: row.id,
+    title: row.title,
+    excerpt: row.excerpt,
+    content: row.content,
+    author: row.author,
+    date: row.date,
+    imageUrl: row.image_url,
+    readTime: row.read_time,
+  };
+}
+
+function blogPostToDb(b: BlogPost): any {
+  return {
+    id: b.id,
+    title: b.title,
+    excerpt: b.excerpt,
+    content: b.content,
+    author: b.author,
+    date: b.date,
+    image_url: b.imageUrl,
+    read_time: b.readTime,
+  };
+}
+
+// --- Storage Service (Supabase) ---
 
 export const StorageService = {
-  getProducts: (): Product[] => {
-    checkVersion();
-    const stored = localStorage.getItem(KEYS.PRODUCTS);
-    if (!stored) {
-      localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(INITIAL_PRODUCTS));
-      return INITIAL_PRODUCTS;
-    }
-    return JSON.parse(stored);
+  // Products
+  getProducts: async (): Promise<Product[]> => {
+    const { data, error } = await supabase.from('products').select('*').order('created_at');
+    if (error) { console.error('Error fetching products:', error); return []; }
+    return (data || []).map(dbToProduct);
   },
 
-  saveProducts: (products: Product[]) => {
-    localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(products));
+  saveProduct: async (product: Product): Promise<void> => {
+    const { error } = await supabase.from('products').upsert(productToDb(product));
+    if (error) console.error('Error saving product:', error);
   },
 
-  getFairs: (): Fair[] => {
-    checkVersion();
-    const stored = localStorage.getItem(KEYS.FAIRS);
-    if (!stored) {
-      localStorage.setItem(KEYS.FAIRS, JSON.stringify(INITIAL_FAIRS));
-      return INITIAL_FAIRS;
-    }
-    return JSON.parse(stored);
+  deleteProduct: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) console.error('Error deleting product:', error);
   },
 
-  saveFairs: (fairs: Fair[]) => {
-    localStorage.setItem(KEYS.FAIRS, JSON.stringify(fairs));
+  // Fairs
+  getFairs: async (): Promise<Fair[]> => {
+    const { data, error } = await supabase.from('fairs').select('*').order('created_at');
+    if (error) { console.error('Error fetching fairs:', error); return []; }
+    return (data || []).map(dbToFair);
   },
 
-  getHistory: (): HistoryEvent[] => {
-    checkVersion();
-    const stored = localStorage.getItem(KEYS.HISTORY);
-    if (!stored) {
-      localStorage.setItem(KEYS.HISTORY, JSON.stringify(INITIAL_HISTORY));
-      return INITIAL_HISTORY;
-    }
-    return JSON.parse(stored);
+  saveFair: async (fair: Fair): Promise<void> => {
+    const { error } = await supabase.from('fairs').upsert(fairToDb(fair));
+    if (error) console.error('Error saving fair:', error);
   },
 
-  saveHistory: (history: HistoryEvent[]) => {
-    localStorage.setItem(KEYS.HISTORY, JSON.stringify(history));
+  deleteFair: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('fairs').delete().eq('id', id);
+    if (error) console.error('Error deleting fair:', error);
   },
 
-  getBlogPosts: (): BlogPost[] => {
-    checkVersion();
-    const stored = localStorage.getItem(KEYS.BLOG);
-    if (!stored) {
-      localStorage.setItem(KEYS.BLOG, JSON.stringify(INITIAL_BLOG_POSTS));
-      return INITIAL_BLOG_POSTS;
-    }
-    return JSON.parse(stored);
+  // History
+  getHistory: async (): Promise<HistoryEvent[]> => {
+    const { data, error } = await supabase.from('history_events').select('*').order('created_at');
+    if (error) { console.error('Error fetching history:', error); return []; }
+    return (data || []).map(dbToHistory);
   },
 
-  saveBlogPosts: (posts: BlogPost[]) => {
-    localStorage.setItem(KEYS.BLOG, JSON.stringify(posts));
+  saveHistoryEvent: async (event: HistoryEvent): Promise<void> => {
+    const { error } = await supabase.from('history_events').upsert(historyToDb(event));
+    if (error) console.error('Error saving history event:', error);
   },
 
-  getCategories: (): string[] => {
-    checkVersion();
-    const stored = localStorage.getItem(KEYS.CATEGORIES);
-    if (!stored) {
-      localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(INITIAL_CATEGORIES));
-      return INITIAL_CATEGORIES;
-    }
-    return JSON.parse(stored);
+  deleteHistoryEvent: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('history_events').delete().eq('id', id);
+    if (error) console.error('Error deleting history event:', error);
   },
 
-  saveCategories: (categories: string[]) => {
-    localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories));
-  }
+  // Blog Posts
+  getBlogPosts: async (): Promise<BlogPost[]> => {
+    const { data, error } = await supabase.from('blog_posts').select('*').order('created_at');
+    if (error) { console.error('Error fetching blog posts:', error); return []; }
+    return (data || []).map(dbToBlogPost);
+  },
+
+  saveBlogPost: async (post: BlogPost): Promise<void> => {
+    const { error } = await supabase.from('blog_posts').upsert(blogPostToDb(post));
+    if (error) console.error('Error saving blog post:', error);
+  },
+
+  deleteBlogPost: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+    if (error) console.error('Error deleting blog post:', error);
+  },
+
+  // Categories
+  getCategories: async (): Promise<string[]> => {
+    const { data, error } = await supabase.from('categories').select('name').order('sort_order');
+    if (error) { console.error('Error fetching categories:', error); return []; }
+    return (data || []).map((r: any) => r.name);
+  },
+
+  addCategory: async (name: string): Promise<void> => {
+    const { data: maxRow } = await supabase.from('categories').select('sort_order').order('sort_order', { ascending: false }).limit(1);
+    const nextOrder = (maxRow && maxRow[0] ? maxRow[0].sort_order : 0) + 1;
+    const { error } = await supabase.from('categories').insert({ name, sort_order: nextOrder });
+    if (error) console.error('Error adding category:', error);
+  },
+
+  deleteCategory: async (name: string): Promise<void> => {
+    const { error } = await supabase.from('categories').delete().eq('name', name);
+    if (error) console.error('Error deleting category:', error);
+  },
+
+  // Image Upload
+  uploadImage: async (file: File, folder: string = 'products'): Promise<string> => {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileName = `${folder}/${Date.now()}-${safeName}`;
+    const { error } = await supabase.storage.from('images').upload(fileName, file, {
+      cacheControl: '31536000',
+      upsert: false,
+    });
+    if (error) throw error;
+    const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+    return data.publicUrl;
+  },
 };
