@@ -32,6 +32,9 @@ const processImageUrl = (url: string, size: number = 800): string => {
   return cleanUrl;
 };
 
+const FALLBACK_IMG = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect fill="#f5ead6" width="400" height="400"/><text x="200" y="200" text-anchor="middle" fill="#9b4d23" font-family="serif" font-size="18">MARIEL\'LA</text></svg>');
+const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => { e.currentTarget.src = FALLBACK_IMG; };
+
 // --- Reveal Animation Component ---
 const Reveal: React.FC<{ children: ReactNode; delay?: number }> = ({ children, delay = 0 }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -84,9 +87,11 @@ const GlobalStyles = () => (
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes zoomFadeIn { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
     @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @keyframes cartBounce { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
     .animate-fade-in-up { animation: fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
     .animate-zoom-fade-in { animation: zoomFadeIn 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
     .animate-slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
+    .animate-cart-bounce { animation: cartBounce 0.4s ease-in-out; }
     .delay-100 { animation-delay: 150ms; }
     .delay-200 { animation-delay: 300ms; }
     .delay-300 { animation-delay: 450ms; }
@@ -208,7 +213,8 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   };
   const clearCart = () => setCart([]);
   const login = (password: string) => {
-    if (password === 'mariella2024') { setIsAdmin(true); return true; }
+    const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || 'mariella2024';
+    if (password === adminPass) { setIsAdmin(true); return true; }
     return false;
   };
   const logout = () => setIsAdmin(false);
@@ -387,10 +393,10 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
 const HeroSection = () => (
   <section id="inicio" className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden bg-leather-900">
     <div className="absolute inset-0 z-0">
-      <img src={processImageUrl("https://drive.google.com/file/d/1qeN28si1WAj_TmotiGxcENBATPK1Ugze/view?usp=drive_link", 1920)} alt="Textura cuero" className="absolute inset-0 w-full h-full object-cover blur-[2px]" />
+      <img src={processImageUrl("https://drive.google.com/file/d/1qeN28si1WAj_TmotiGxcENBATPK1Ugze/view?usp=drive_link", 1920)} alt="Textura cuero" className="absolute inset-0 w-full h-full object-cover blur-[2px]" onError={handleImgError} />
       <div className="absolute inset-0 bg-leather-900/40 z-10" />
       <div className="absolute inset-0 bg-gradient-to-t from-leather-900/80 to-transparent z-10" />
-      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-20 opacity-15 mix-blend-overlay"><source src="https://videos.pexels.com/video-files/8065485/8065485-hd_1920_1080_25fps.mp4" type="video/mp4" /></video>
+      <div className="absolute inset-0 z-20 opacity-10 mix-blend-overlay" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)'}} />
     </div>
     <div className="relative z-30 text-center px-4 max-w-4xl mx-auto">
       <span className="block text-leather-100 text-sm md:text-base tracking-[0.3em] uppercase mb-10 font-bold animate-fade-in-up drop-shadow-md text-shadow-sm">Artesanía Uruguaya</span>
@@ -477,7 +483,7 @@ const FeaturedCarousel = () => {
 
   return (
     <section id="coleccion" className="py-24 border-t border-leather-100 scroll-mt-20 relative bg-[#fdfbf7]">
-      <div className="absolute inset-0 opacity-40 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] pointer-events-none"></div>
+      <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none"></div>
       <div className="max-w-7xl mx-auto px-4 relative z-10">
         <div className="text-center mb-12">
            <span className="text-leather-600 uppercase tracking-widest text-xs font-bold">Hecho a Mano</span>
@@ -489,7 +495,7 @@ const FeaturedCarousel = () => {
                 <div key={product.id} className="w-1/3 group relative">
                   <Link to={`/producto/${product.id}`} className="block">
                     <div className="aspect-[4/5] overflow-hidden rounded-lg mb-4 relative shadow-md">
-                       <img src={processImageUrl(product.images[0], 600)} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
+                       <img src={processImageUrl(product.images[0], 600)} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" onError={handleImgError} />
                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-leather-900/80 backdrop-blur-sm text-white text-sm px-4 py-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none font-bold shadow-xl text-center min-w-[140px]">{product.name}</div>
                     </div>
                     <h3 className="text-xl font-serif font-bold text-leather-900">{product.name}</h3>
@@ -535,7 +541,7 @@ const FairsTeaser = () => {
 
   return (
     <section id="ferias" className="py-24 bg-leather-50 border-t border-leather-200 scroll-mt-20 relative">
-       <div className="absolute inset-0 opacity-50 bg-[url('https://www.transparenttextures.com/patterns/canvas-orange.png')] pointer-events-none"></div>
+       <div className="absolute inset-0 opacity-50 bg-[radial-gradient(circle,rgba(103,51,30,0.04)_1px,transparent_1px)] bg-[size:12px_12px] pointer-events-none"></div>
       <div className="max-w-5xl mx-auto px-4 text-center relative z-10">
         <span className="text-leather-600 uppercase tracking-widest text-xs font-bold">Encuentros</span>
         <h2 className="text-4xl font-serif font-bold text-leather-900 mt-2 mb-12">Próximas Ferias</h2>
@@ -583,10 +589,10 @@ const ContactSection = () => (
               </a>
             </div>
           </div>
-          <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/leather.png')]"></div>
+          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:8px_8px]"></div>
         </div>
         <div className="md:w-1/2 bg-leather-50 relative min-h-[400px] flex items-center justify-center p-8 overflow-hidden">
-          <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]"></div>
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:16px_16px]"></div>
           {/* Circular Image Container for the Artisan */}
           <div className="relative w-64 h-64 rounded-full border-[6px] border-white shadow-2xl overflow-hidden z-10 ring-4 ring-leather-200/50">
              <img src={processImageUrl("https://drive.google.com/file/d/1nMQHF1eWwDKQsQL-Fggx1lbex5V0nZ3b/view?usp=drive_link", 600)} alt="Mariela Calistro" className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700" />
@@ -1028,7 +1034,7 @@ const CatalogPage = () => {
             {filtered.map(product => (
               <div key={product.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all group border border-leather-100">
                 <Link to={`/producto/${product.id}`} className="block relative aspect-square overflow-hidden">
-                  <img src={processImageUrl(product.images[0], 400)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt={product.name} loading="lazy" />
+                  <img src={processImageUrl(product.images[0], 400)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt={product.name} loading="lazy" onError={handleImgError} />
                 </Link>
                 <div className="p-4">
                   <Link to={`/producto/${product.id}`}><h3 className="font-bold text-lg text-leather-900 mb-2">{product.name}</h3></Link>
@@ -1055,7 +1061,7 @@ const HistoryPage = () => {
   useEffect(() => { document.title = "Historia - MARIEL'LA"; }, []);
   return (
     <div className="pt-36 pb-24 bg-[#fdfbf7] min-h-screen relative">
-      <div className="absolute inset-0 opacity-40 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] pointer-events-none"></div>
+      <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none"></div>
       <div className="max-w-4xl mx-auto px-4 relative z-10">
         <div className="text-center mb-20">
           <span className="text-leather-600 uppercase tracking-widest text-xs font-bold block mb-2">Desde 1998</span>
@@ -1187,17 +1193,16 @@ const LoginPage = () => {
 };
 
 const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-  const { cart, removeFromCart, updateCartQuantity, currency } = useStore();
+  const { cart, removeFromCart, updateCartQuantity, currency, setCurrency } = useStore();
   const total = cart.reduce((sum, item) => sum + (currency === 'UYU' ? item.priceUYU : item.priceUSD) * item.quantity, 0);
 
   const handleCheckout = () => {
+    if (cart.length === 0) return;
     let message = "Hola MARIEL'LA, me gustaría realizar el siguiente pedido:\n\n";
     cart.forEach(item => {
       message += `• ${item.quantity}x ${item.name} (${currency} ${currency === 'UYU' ? item.priceUYU : item.priceUSD})\n`;
     });
     message += `\nTotal: ${currency} ${total}`;
-    
-    // Using correct format for WhatsApp link: +598 98 766 318
     const whatsappUrl = `https://wa.me/59898766318?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -1208,76 +1213,137 @@ const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
     <div className="fixed inset-0 z-[60]">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl p-6 flex flex-col animate-slide-in-right">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-serif font-bold text-leather-900">Tu Carrito</h2>
           <button onClick={onClose} className="p-2 hover:bg-leather-50 rounded-full text-leather-900"><X /></button>
         </div>
+        {/* Currency Toggle */}
+        <div className="flex items-center gap-2 mb-6 bg-leather-50 rounded-lg p-1 self-start border border-leather-100">
+          <button onClick={() => setCurrency('UYU')} className={`px-3 py-1 rounded-md text-sm font-bold transition-all ${currency === 'UYU' ? 'bg-leather-900 text-white shadow-sm' : 'text-leather-600 hover:text-leather-900'}`}>UYU</button>
+          <button onClick={() => setCurrency('USD')} className={`px-3 py-1 rounded-md text-sm font-bold transition-all ${currency === 'USD' ? 'bg-leather-900 text-white shadow-sm' : 'text-leather-600 hover:text-leather-900'}`}>USD</button>
+        </div>
         <div className="flex-1 overflow-y-auto space-y-4">
-          {cart.length === 0 ? <p className="text-center text-leather-500 py-10 font-medium">Tu carrito está vacío.</p> : cart.map(item => (
+          {cart.length === 0 ? (
+            <div className="text-center py-16">
+              <ShoppingBag size={48} className="mx-auto text-leather-200 mb-4" />
+              <p className="text-leather-500 font-medium">Tu carrito está vacío.</p>
+              <button onClick={onClose} className="mt-4 text-leather-800 font-bold border-b border-leather-800 hover:text-leather-600 hover:border-leather-600 transition-colors text-sm">Seguir comprando</button>
+            </div>
+          ) : cart.map(item => (
             <div key={item.id} className="flex gap-4 border-b border-leather-100 pb-4">
-              <img src={processImageUrl(item.images[0], 100)} className="w-20 h-20 object-cover rounded border border-leather-100" alt={item.name} />
+              <img src={processImageUrl(item.images[0], 100)} className="w-20 h-20 object-cover rounded-lg border border-leather-100" alt={item.name} />
               <div className="flex-1">
-                <h3 className="font-bold text-leather-900">{item.name}</h3>
-                <p className="text-leather-600 font-medium">{currency} {currency === 'UYU' ? item.priceUYU : item.priceUSD}</p>
+                <h3 className="font-bold text-leather-900 text-sm leading-tight">{item.name}</h3>
+                <p className="text-leather-600 font-bold mt-1">{currency} {currency === 'UYU' ? item.priceUYU : item.priceUSD}</p>
                 <div className="flex items-center gap-3 mt-2">
-                  <button onClick={() => updateCartQuantity(item.id, -1)} className="p-1 bg-leather-100 rounded hover:bg-leather-200 text-leather-800"><Minus size={14} /></button>
-                  <span className="font-bold text-leather-900">{item.quantity}</span>
-                  <button onClick={() => updateCartQuantity(item.id, 1)} className="p-1 bg-leather-100 rounded hover:bg-leather-200 text-leather-800"><Plus size={14} /></button>
+                  <button onClick={() => updateCartQuantity(item.id, -1)} className="w-7 h-7 flex items-center justify-center bg-leather-100 rounded-full hover:bg-leather-200 text-leather-800 transition"><Minus size={14} /></button>
+                  <span className="font-bold text-leather-900 min-w-[20px] text-center">{item.quantity}</span>
+                  <button onClick={() => updateCartQuantity(item.id, 1)} className="w-7 h-7 flex items-center justify-center bg-leather-100 rounded-full hover:bg-leather-200 text-leather-800 transition"><Plus size={14} /></button>
                 </div>
               </div>
-              <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 self-start p-1"><Trash2 size={18} /></button>
+              <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 self-start p-1 transition"><Trash2 size={18} /></button>
             </div>
           ))}
         </div>
-        <div className="border-t border-leather-200 pt-6 mt-4">
-          <div className="flex justify-between text-xl font-bold text-leather-900 mb-6">
-            <span>Total</span>
-            <span>{currency} {total}</span>
+        {cart.length > 0 && (
+          <div className="border-t border-leather-200 pt-6 mt-4">
+            <div className="flex justify-between text-xl font-bold text-leather-900 mb-2">
+              <span>Total</span>
+              <span>{currency} {total.toLocaleString()}</span>
+            </div>
+            <p className="text-xs text-leather-500 mb-6 flex items-center gap-1"><Truck size={14} /> Envíos a todo Uruguay</p>
+            <button onClick={handleCheckout} className="w-full bg-[#25D366] text-white py-4 rounded-xl font-bold hover:bg-[#128C7E] transition shadow-lg flex items-center justify-center gap-2 active:scale-95 transform">
+              <MessageCircle size={24} className="fill-white" /> Finalizar en WhatsApp
+            </button>
           </div>
-          <button onClick={handleCheckout} className="w-full bg-[#25D366] text-white py-4 rounded-lg font-bold hover:bg-[#128C7E] transition shadow-lg flex items-center justify-center gap-2">
-            <MessageCircle size={24} /> Finalizar en WhatsApp
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
 const Footer = () => (
-  <footer className="bg-leather-900 text-leather-300 py-12 border-t border-leather-800">
-    <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
-      <div>
+  <footer className="bg-leather-900 text-leather-300 py-16 border-t border-leather-800">
+    <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-10">
+      <div className="md:col-span-1">
         <h3 className="text-white font-serif font-bold text-2xl mb-4">MARIEL'LA</h3>
-        <p className="text-sm font-medium">Artesanía en cuero con identidad uruguaya. Calidad que perdura.</p>
-      </div>
-      <div>
-        <h4 className="text-white font-bold mb-4">Enlaces</h4>
-        <ul className="space-y-2 text-sm font-medium">
-          <li><Link to="/catalogo" className="hover:text-white transition">Tienda</Link></li>
-          {/* History Link Removed */}
-          <li><Link to="/blog" className="hover:text-white transition">Blog</Link></li>
-        </ul>
-      </div>
-      <div>
-        <h4 className="text-white font-bold mb-4">Contacto</h4>
-        <ul className="space-y-2 text-sm font-medium">
-          {/* Email Removed */}
-          <li>+598 98 766 318</li>
-          <li>Montevideo, Uruguay</li>
-        </ul>
-      </div>
-      <div>
-        <h4 className="text-white font-bold mb-4">Síguenos</h4>
-        <div className="flex gap-4">
-          <a href="https://www.instagram.com/mariellacalistro/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition"><Instagram size={20} /></a>
+        <p className="text-sm font-medium leading-relaxed mb-4">Artesanía en cuero con identidad uruguaya. Cada pieza cuenta una historia de tradición y pasión.</p>
+        <div className="flex gap-4 mt-4">
+          <a href="https://www.instagram.com/mariellacalistro/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-leather-800 flex items-center justify-center hover:bg-leather-700 transition-colors"><Instagram size={18} className="text-leather-200" /></a>
+          <a href="https://wa.me/59898766318" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-leather-800 flex items-center justify-center hover:bg-[#25D366] transition-colors"><MessageCircle size={18} className="text-leather-200" /></a>
         </div>
       </div>
+      <div>
+        <h4 className="text-white font-bold mb-4 text-sm uppercase tracking-wider">Tienda</h4>
+        <ul className="space-y-3 text-sm font-medium">
+          <li><Link to="/catalogo" className="hover:text-white transition-colors">Colección</Link></li>
+          <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+          <li><Link to="/ferias" className="hover:text-white transition-colors">Ferias</Link></li>
+        </ul>
+      </div>
+      <div>
+        <h4 className="text-white font-bold mb-4 text-sm uppercase tracking-wider">Contacto</h4>
+        <ul className="space-y-3 text-sm font-medium">
+          <li className="flex items-center gap-2"><Phone size={14} /> +598 98 766 318</li>
+          <li className="flex items-center gap-2"><MapPin size={14} /> Montevideo, Uruguay</li>
+        </ul>
+      </div>
+      <div>
+        <h4 className="text-white font-bold mb-4 text-sm uppercase tracking-wider">Artesanía</h4>
+        <ul className="space-y-3 text-sm font-medium">
+          <li className="flex items-center gap-2"><Truck size={14} /> Envíos a todo el país</li>
+          <li className="flex items-center gap-2"><Heart size={14} className="text-red-400" /> 100% hecho a mano</li>
+          <li className="flex items-center gap-2"><Star size={14} /> Cuero genuino</li>
+        </ul>
+      </div>
     </div>
-    <div className="max-w-7xl mx-auto px-4 mt-12 pt-8 border-t border-leather-800 text-center text-xs font-medium">
+    <div className="max-w-7xl mx-auto px-4 mt-12 pt-8 border-t border-leather-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-medium">
       <p>&copy; {new Date().getFullYear()} MARIEL'LA. Todos los derechos reservados.</p>
+      <p className="text-leather-500">Artesanía en cuero uruguaya desde 1998</p>
     </div>
   </footer>
 );
+
+// --- 404 Page ---
+const NotFoundPage = () => {
+  useEffect(() => { document.title = "Página no encontrada - MARIEL'LA"; }, []);
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-leather-50 pt-20">
+      <div className="text-center px-4 max-w-lg">
+        <div className="inline-block relative p-6 mb-8 leather-patch rounded-lg">
+          <div className="absolute inset-2 stitch-border rounded-md pointer-events-none"></div>
+          <span className="text-stitch text-6xl font-serif font-bold">404</span>
+        </div>
+        <h1 className="text-3xl font-serif font-bold text-leather-900 mb-4">Página no encontrada</h1>
+        <p className="text-leather-600 mb-8 font-medium">Lo sentimos, la página que buscás no existe o fue movida.</p>
+        <Link to="/" className="bg-leather-900 text-white px-8 py-3 rounded-lg font-bold hover:bg-leather-800 transition shadow-lg inline-block">Volver al inicio</Link>
+      </div>
+    </div>
+  );
+};
+
+// --- Error Boundary ---
+class ErrorBoundary extends React.Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-leather-50">
+          <div className="text-center px-4 max-w-lg">
+            <h1 className="text-3xl font-serif font-bold text-leather-900 mb-4">Algo salió mal</h1>
+            <p className="text-leather-600 mb-8 font-medium">Ocurrió un error inesperado. Intentá recargar la página.</p>
+            <button onClick={() => window.location.reload()} className="bg-leather-900 text-white px-8 py-3 rounded-lg font-bold hover:bg-leather-800 transition shadow-lg">Recargar página</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // --- Main App Component ---
 
@@ -1286,26 +1352,29 @@ const App = () => {
   const toggleCart = () => setIsCartOpen(!isCartOpen);
 
   return (
-    <StoreProvider>
-      <HashRouter>
-        <GlobalStyles />
-        <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-        <Navbar toggleCart={toggleCart} />
-        <FloatingWhatsApp />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/catalogo" element={<CatalogPage />} />
-          <Route path="/historia" element={<HistoryPage />} />
-          <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/:id" element={<BlogPage />} />
-          <Route path="/ferias" element={<FairsPage />} />
-          <Route path="/producto/:id" element={<ProductDetail />} />
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="/login" element={<LoginPage />} />
-        </Routes>
-        <Footer />
-      </HashRouter>
-    </StoreProvider>
+    <ErrorBoundary>
+      <StoreProvider>
+        <HashRouter>
+          <GlobalStyles />
+          <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+          <Navbar toggleCart={toggleCart} />
+          <FloatingWhatsApp />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/catalogo" element={<CatalogPage />} />
+            <Route path="/historia" element={<HistoryPage />} />
+            <Route path="/blog" element={<BlogPage />} />
+            <Route path="/blog/:id" element={<BlogPage />} />
+            <Route path="/ferias" element={<FairsPage />} />
+            <Route path="/producto/:id" element={<ProductDetail />} />
+            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+          <Footer />
+        </HashRouter>
+      </StoreProvider>
+    </ErrorBoundary>
   );
 };
 

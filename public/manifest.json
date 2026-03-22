@@ -1,0 +1,16 @@
+{
+  "name": "MARIEL'LA | Artesanía en Cuero",
+  "short_name": "MARIEL'LA",
+  "description": "Artesanía en cuero genuino hecha a mano en Uruguay",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf7f0",
+  "theme_color": "#67331e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

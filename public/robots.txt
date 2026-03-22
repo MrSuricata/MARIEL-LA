@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mariel-la.vercel.app/sitemap.xml
+
+# Block admin routes
+Disallow: /#/admin
+Disallow: /#/login
