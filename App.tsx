@@ -148,6 +148,8 @@ interface StoreContextType {
   blogPosts: BlogPost[];
   categories: string[];
   currency: Currency;
+  exchangeRate: number;
+  convertPrice: (priceUYU: number) => number;
   isAdmin: boolean;
   login: (password: string) => boolean;
   logout: () => void;
@@ -187,7 +189,13 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [categories, setCategories] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [currency, setCurrency] = useState<Currency>('UYU');
+  const [exchangeRate, setExchangeRate] = useState<number>(42); // fallback ~42 UYU/USD
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+
+  const convertPrice = (priceUYU: number): number => {
+    if (currency === 'UYU') return priceUYU;
+    return Math.round(priceUYU / exchangeRate);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -205,6 +213,11 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       setCategories(cats);
     };
     loadData();
+    // Fetch exchange rate USD/UYU
+    fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json')
+      .then(r => r.json())
+      .then(data => { if (data?.usd?.uyu) setExchangeRate(data.usd.uyu); })
+      .catch(() => {}); // Keep fallback
     const savedCart = localStorage.getItem('mariella_cart');
     if (savedCart) setCart(JSON.parse(savedCart));
   }, []);
@@ -260,8 +273,8 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   return (
     <StoreContext.Provider value={{
-      products, cart, fairs, history, blogPosts, categories, currency, isAdmin,
-      setCurrency, addToCart, removeFromCart, updateCartQuantity, clearCart, login, logout, 
+      products, cart, fairs, history, blogPosts, categories, currency, exchangeRate, convertPrice, isAdmin,
+      setCurrency, addToCart, removeFromCart, updateCartQuantity, clearCart, login, logout,
       addProduct, updateProduct, deleteProduct, addFair, updateFair, deleteFair,
       addHistoryEvent, updateHistoryEvent, deleteHistoryEvent, addBlogPost, updateBlogPost, deleteBlogPost,
       addCategory, deleteCategory
@@ -483,7 +496,7 @@ const HomePage = () => {
 // --- Sections Components ---
 
 const FeaturedCarousel = () => {
-  const { products, currency } = useStore();
+  const { products, currency, convertPrice } = useStore();
   const displayProducts = products.filter(p => p.isFeatured).concat(products.filter(p => !p.isFeatured)).slice(0, 6);
   const [startIndex, setStartIndex] = useState(0);
 
@@ -509,7 +522,7 @@ const FeaturedCarousel = () => {
                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-leather-900/80 backdrop-blur-sm text-white text-sm px-4 py-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none font-bold shadow-xl text-center min-w-[140px]">{product.name}</div>
                     </div>
                     <h3 className="text-xl font-serif font-bold text-leather-900">{product.name}</h3>
-                    <p className="text-leather-600 font-bold text-lg">{currency} {currency === 'UYU' ? product.priceUYU : product.priceUSD}</p>
+                    <p className="text-leather-600 font-bold text-lg">{currency} {convertPrice(product.priceUYU).toLocaleString()}</p>
                   </Link>
                 </div>
              ))}
@@ -531,7 +544,7 @@ const FeaturedCarousel = () => {
                     </div>
                     <div className="flex justify-between items-center mt-2">
                        <h3 className="text-xl font-serif font-bold text-leather-900">{product.name}</h3>
-                       <p className="text-leather-600 font-bold">{currency} {currency === 'UYU' ? product.priceUYU : product.priceUSD}</p>
+                       <p className="text-leather-600 font-bold">{currency} {convertPrice(product.priceUYU).toLocaleString()}</p>
                     </div>
                   </Link>
               </div>
@@ -682,7 +695,7 @@ const BlogPage = () => {
 
 const ProductDetail = () => {
   const { id } = useParams();
-  const { products, addToCart, currency } = useStore();
+  const { products, addToCart, currency, convertPrice } = useStore();
   const [selectedImg, setSelectedImg] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [showMagnifier, setShowMagnifier] = useState(false);
@@ -740,7 +753,7 @@ const ProductDetail = () => {
               <div className="mb-6">
                  <span className="text-leather-600 font-bold uppercase tracking-wider text-sm">{product.category}</span>
                  <h1 className="text-4xl md:text-5xl font-serif font-bold text-leather-900 mt-2 mb-4">{product.name}</h1>
-                 <p className="text-3xl font-light text-leather-800 font-serif">{currency} {currency === 'UYU' ? product.priceUYU : product.priceUSD}</p>
+                 <p className="text-3xl font-light text-leather-800 font-serif">{currency} {convertPrice(product.priceUYU).toLocaleString()}</p>
               </div>
               <div className="prose prose-lg text-leather-800 mb-10 leading-relaxed font-medium"><p>{product.description}</p></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 p-6 bg-leather-50 rounded-xl border border-leather-100">
@@ -763,7 +776,7 @@ const ProductDetail = () => {
                         <img src={processImageUrl(rp.images[0], 600)} alt={rp.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                       </div>
                       <h3 className="font-bold text-leather-900 text-lg group-hover:text-leather-600 transition">{rp.name}</h3>
-                      <p className="text-leather-600 font-medium">{currency} {currency === 'UYU' ? rp.priceUYU : rp.priceUSD}</p>
+                      <p className="text-leather-600 font-medium">{currency} {convertPrice(rp.priceUYU).toLocaleString()}</p>
                     </Link>
                   </div>
                 ))}
@@ -784,7 +797,7 @@ const ProductDetail = () => {
 
 // Admin Panel Updates
 const AdminPanel = () => {
-  const { products, fairs, history, blogPosts, categories, logout, addProduct, updateProduct, deleteProduct, addFair, updateFair, deleteFair, addHistoryEvent, updateHistoryEvent, deleteHistoryEvent, addBlogPost, updateBlogPost, deleteBlogPost, addCategory, deleteCategory } = useStore();
+  const { products, fairs, history, blogPosts, categories, exchangeRate, logout, addProduct, updateProduct, deleteProduct, addFair, updateFair, deleteFair, addHistoryEvent, updateHistoryEvent, deleteHistoryEvent, addBlogPost, updateBlogPost, deleteBlogPost, addCategory, deleteCategory } = useStore();
   const [activeTab, setActiveTab] = useState<'products' | 'fairs' | 'history' | 'blog' | 'categories' | 'system'>('products');
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [editingFair, setEditingFair] = useState<Partial<Fair> | null>(null);
@@ -830,9 +843,10 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               <div><label className="text-xs font-bold text-leather-700 mb-1 block">Categoría</label><select style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as any})}>{categories.filter(c => c !== 'Todas').map(c => <option key={c} value={c}>{c}</option>)}</select></div>
             </div>
             <div><label className="text-xs font-bold text-leather-700 mb-1 block">Descripción</label><textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-24" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-            <div className="grid grid-cols-2 gap-5">
-              <div><label className="text-xs font-bold text-leather-700 mb-1 block">UYU</label><input style={{backgroundColor: 'white'}} type="number" className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.priceUYU} onChange={e => setFormData({...formData, priceUYU: Number(e.target.value)})} /></div>
-              <div><label className="text-xs font-bold text-leather-700 mb-1 block">USD</label><input style={{backgroundColor: 'white'}} type="number" className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.priceUSD} onChange={e => setFormData({...formData, priceUSD: Number(e.target.value)})} /></div>
+            <div>
+              <label className="text-xs font-bold text-leather-700 mb-1 block">Precio (UYU)</label>
+              <input style={{backgroundColor: 'white'}} type="number" min="0" className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.priceUYU} onChange={e => setFormData({...formData, priceUYU: Number(e.target.value)})} />
+              {formData.priceUYU ? <p className="text-xs text-leather-400 mt-1">≈ USD {Math.round((formData.priceUYU || 0) / exchangeRate)} (cotización del día: 1 USD = {exchangeRate} UYU)</p> : null}
             </div>
             <div>
               <label className="text-xs font-bold text-leather-700 mb-1 block">Subir Fotos desde PC</label>
@@ -1039,7 +1053,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
 // --- Missing Pages and Components ---
 
 const CatalogPage = () => {
-  const { products, currency, addToCart, categories } = useStore();
+  const { products, currency, convertPrice, addToCart, categories } = useStore();
   const [filter, setFilter] = useState('Todas');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -1097,7 +1111,7 @@ const CatalogPage = () => {
                 <div className="p-4">
                   <Link to={`/producto/${product.id}`}><h3 className="font-bold text-lg text-leather-900 mb-2">{product.name}</h3></Link>
                   <div className="flex justify-between items-center">
-                    <span className="text-leather-600 font-bold">{currency} {currency === 'UYU' ? product.priceUYU : product.priceUSD}</span>
+                    <span className="text-leather-600 font-bold">{currency} {convertPrice(product.priceUYU).toLocaleString()}</span>
                     <button onClick={() => addToCart(product)} className="p-2 bg-leather-50 rounded-full hover:bg-leather-900 hover:text-white transition-colors border border-leather-100"><ShoppingBag size={18} /></button>
                   </div>
                 </div>
@@ -1251,14 +1265,14 @@ const LoginPage = () => {
 };
 
 const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-  const { cart, removeFromCart, updateCartQuantity, currency, setCurrency } = useStore();
-  const total = cart.reduce((sum, item) => sum + (currency === 'UYU' ? item.priceUYU : item.priceUSD) * item.quantity, 0);
+  const { cart, removeFromCart, updateCartQuantity, currency, setCurrency, convertPrice } = useStore();
+  const total = cart.reduce((sum, item) => sum + convertPrice(item.priceUYU) * item.quantity, 0);
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
     let message = "Hola MARIEL'LA, me gustaría realizar el siguiente pedido:\n\n";
     cart.forEach(item => {
-      message += `• ${item.quantity}x ${item.name} (${currency} ${currency === 'UYU' ? item.priceUYU : item.priceUSD})\n`;
+      message += `• ${item.quantity}x ${item.name} (${currency} ${convertPrice(item.priceUYU)})\n`;
     });
     message += `\nTotal: ${currency} ${total}`;
     const whatsappUrl = `https://wa.me/59898766318?text=${encodeURIComponent(message)}`;
@@ -1292,7 +1306,7 @@ const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
               <img src={processImageUrl(item.images[0], 100)} className="w-20 h-20 object-cover rounded-lg border border-leather-100" alt={item.name} />
               <div className="flex-1">
                 <h3 className="font-bold text-leather-900 text-sm leading-tight">{item.name}</h3>
-                <p className="text-leather-600 font-bold mt-1">{currency} {currency === 'UYU' ? item.priceUYU : item.priceUSD}</p>
+                <p className="text-leather-600 font-bold mt-1">{currency} {convertPrice(item.priceUYU).toLocaleString()}</p>
                 <div className="flex items-center gap-3 mt-2">
                   <button onClick={() => updateCartQuantity(item.id, -1)} className="w-7 h-7 flex items-center justify-center bg-leather-100 rounded-full hover:bg-leather-200 text-leather-800 transition"><Minus size={14} /></button>
                   <span className="font-bold text-leather-900 min-w-[20px] text-center">{item.quantity}</span>
