@@ -10,6 +10,7 @@ export interface Product {
   colors: string[];
   dimensions: string;
   isFeatured: boolean;
+  isSoldOut?: boolean;
 }
 
 export interface CartItem extends Product {

@@ -16,6 +16,7 @@ function dbToProduct(row: any): Product {
     colors: row.colors || [],
     dimensions: row.dimensions,
     isFeatured: row.is_featured,
+    isSoldOut: row.is_sold_out || false,
   };
 }
 
@@ -32,6 +33,7 @@ function productToDb(p: Product): any {
     colors: Array.isArray(p.colors) ? p.colors : [],
     dimensions: p.dimensions,
     is_featured: p.isFeatured,
+    is_sold_out: p.isSoldOut || false,
   };
 }
 

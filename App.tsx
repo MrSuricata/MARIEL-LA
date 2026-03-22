@@ -218,8 +218,10 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       .then(r => r.json())
       .then(data => { if (data?.usd?.uyu) setExchangeRate(data.usd.uyu); })
       .catch(() => {}); // Keep fallback
-    const savedCart = localStorage.getItem('mariella_cart');
-    if (savedCart) setCart(JSON.parse(savedCart));
+    try {
+      const savedCart = localStorage.getItem('mariella_cart');
+      if (savedCart) setCart(JSON.parse(savedCart));
+    } catch { /* corrupted cart data, start fresh */ }
   }, []);
 
   useEffect(() => { localStorage.setItem('mariella_cart', JSON.stringify(cart)); }, [cart]);
@@ -238,7 +240,7 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   };
   const clearCart = () => setCart([]);
   const login = (password: string) => {
-    const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || 'mariella2024';
+    const adminPass = import.meta.env.VITE_ADMIN_PASSWORD;
     if (password === adminPass) { setIsAdmin(true); return true; }
     return false;
   };
@@ -387,10 +389,10 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
                 </span>
               )}
             </button>
-            <Link to={isAdmin ? "/admin" : "/login"} className={`p-2 rounded-full hover:bg-white/20 transition-colors ${iconColorClass}`}>
+            <Link to={isAdmin ? "/admin" : "/login"} className={`p-2 rounded-full hover:bg-white/20 transition-colors ${iconColorClass}`} aria-label="Configuración">
               <Settings size={20} />
             </Link>
-            <button className={`md:hidden p-2 rounded-full ${iconColorClass}`} onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            <button className={`md:hidden p-2 rounded-full ${iconColorClass}`} onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}>
               {isMenuOpen ? <X /> : <Menu />}
             </button>
           </div>
@@ -760,7 +762,11 @@ const ProductDetail = () => {
                 <div><span className="font-bold text-leather-900 block mb-2">Materiales</span><ul className="text-sm text-leather-800 space-y-1">{product.materials.map(m => <li key={m} className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-leather-500"></div>{m}</li>)}</ul></div>
                 <div><span className="font-bold text-leather-900 block mb-2">Detalles</span><p className="text-sm text-leather-800 mb-2"><span className="font-semibold">Medidas:</span> {product.dimensions}</p><p className="text-sm text-leather-800"><span className="font-semibold">Colores:</span> {product.colors.join(', ')}</p></div>
               </div>
-              <button onClick={() => addToCart(product)} className="w-full bg-leather-900 text-white px-8 py-5 rounded-lg font-bold text-lg hover:bg-leather-800 transition shadow-lg transform active:scale-95">Agregar al Carrito</button>
+              {product.isSoldOut ? (
+                <div className="w-full bg-red-100 text-red-700 px-8 py-5 rounded-lg font-bold text-lg text-center border border-red-200">🚫 Producto Agotado</div>
+              ) : (
+                <button onClick={() => addToCart(product)} className="w-full bg-leather-900 text-white px-8 py-5 rounded-lg font-bold text-lg hover:bg-leather-800 transition shadow-lg transform active:scale-95">Agregar al Carrito</button>
+              )}
             </div>
           </div>
           
@@ -827,46 +833,63 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
   };
 
   const ProductForm = () => {
-    const [formData, setFormData] = useState<Partial<Product>>(editingProduct || { name: '', description: '', priceUYU: 0, priceUSD: 0, category: categories[1] || 'Carteras', images: [''], materials: [], colors: [], dimensions: '', isFeatured: false });
+    const [formData, setFormData] = useState<Partial<Product>>(editingProduct || { name: '', description: '', priceUYU: 0, priceUSD: 0, category: categories[1] || 'Carteras', images: [''], materials: [], colors: [], dimensions: '', isFeatured: false, isSoldOut: false });
+    const [uploading, setUploading] = useState(false);
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      const p = { ...formData, id: formData.id || Date.now().toString(), materials: typeof formData.materials === 'string' ? (formData.materials as string).split('\n') : formData.materials, colors: typeof formData.colors === 'string' ? (formData.colors as string).split('\n') : formData.colors, images: Array.isArray(formData.images) ? formData.images.filter(i => i !== '') : [] } as Product;
+      const p = { ...formData, id: formData.id || Date.now().toString(), materials: typeof formData.materials === 'string' ? (formData.materials as string).split('\n').filter(Boolean) : formData.materials, colors: typeof formData.colors === 'string' ? (formData.colors as string).split('\n').filter(Boolean) : formData.colors, images: Array.isArray(formData.images) ? formData.images.filter(i => i !== '') : [] } as Product;
       if (formData.id) updateProduct(p); else addProduct(p);
       setEditingProduct(null);
     };
     return (
-      <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200">
+      <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-sm sm:max-w-2xl w-full border border-leather-200 my-8 max-h-[90vh] overflow-y-auto">
           <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{formData.id ? 'Editar' : 'Nuevo'} Producto</h3>
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="grid grid-cols-2 gap-5">
-              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Nombre</label><input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Nombre *</label><input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
               <div><label className="text-xs font-bold text-leather-700 mb-1 block">Categoría</label><select style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as any})}>{categories.filter(c => c !== 'Todas').map(c => <option key={c} value={c}>{c}</option>)}</select></div>
             </div>
-            <div><label className="text-xs font-bold text-leather-700 mb-1 block">Descripción</label><textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-24" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-            <div>
-              <label className="text-xs font-bold text-leather-700 mb-1 block">Precio (UYU)</label>
-              <input style={{backgroundColor: 'white'}} type="number" min="0" className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.priceUYU} onChange={e => setFormData({...formData, priceUYU: Number(e.target.value)})} />
-              {formData.priceUYU ? <p className="text-xs text-leather-400 mt-1">≈ USD {Math.round((formData.priceUYU || 0) / exchangeRate)} (cotización del día: 1 USD = {exchangeRate} UYU)</p> : null}
+            <div><label className="text-xs font-bold text-leather-700 mb-1 block">Descripción</label><textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-20" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-leather-700 mb-1 block">Precio (UYU) *</label>
+                <input style={{backgroundColor: 'white'}} type="number" min="0" className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.priceUYU} onChange={e => setFormData({...formData, priceUYU: Number(e.target.value)})} required />
+                {formData.priceUYU ? <p className="text-xs text-leather-400 mt-1">≈ USD {Math.round((formData.priceUYU || 0) / exchangeRate)}</p> : null}
+              </div>
+              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Dimensiones</label><input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="ej: 35cm x 30cm x 12cm" value={formData.dimensions} onChange={e => setFormData({...formData, dimensions: e.target.value})} /></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Materiales (uno por línea)</label><textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm" placeholder="Cuero genuino&#10;Herrajes metálicos" value={Array.isArray(formData.materials) ? formData.materials.join('\n') : formData.materials} onChange={e => setFormData({...formData, materials: e.target.value.split('\n') as any})} /></div>
+              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Colores (uno por línea)</label><textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm" placeholder="Marrón&#10;Negro" value={Array.isArray(formData.colors) ? formData.colors.join('\n') : formData.colors} onChange={e => setFormData({...formData, colors: e.target.value.split('\n') as any})} /></div>
+            </div>
+            <div className="flex flex-wrap gap-6">
+              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isFeatured || false} onChange={e => setFormData({...formData, isFeatured: e.target.checked})} className="w-4 h-4 rounded border-leather-300 text-leather-600 focus:ring-leather-500" /><span className="text-sm font-bold text-leather-700">⭐ Destacado</span></label>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isSoldOut || false} onChange={e => setFormData({...formData, isSoldOut: e.target.checked})} className="w-4 h-4 rounded border-leather-300 text-red-600 focus:ring-red-500" /><span className="text-sm font-bold text-red-600">🚫 Agotado</span></label>
             </div>
             <div>
-              <label className="text-xs font-bold text-leather-700 mb-1 block">Subir Fotos desde PC</label>
-              <label className="flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-4 hover:border-leather-500 transition-colors">
+              <label className="text-xs font-bold text-leather-700 mb-1 block">Fotos del Producto</label>
+              <label className={`flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-4 hover:border-leather-500 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Upload size={20} className="text-leather-500" />
-                <span className="text-sm text-leather-600 font-medium">Click para seleccionar imágenes</span>
-                <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
+                <span className="text-sm text-leather-600 font-medium">{uploading ? 'Subiendo...' : 'Click para seleccionar imágenes'}</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={async (e) => {
                   const files = Array.from(e.target.files || []);
                   if (files.length === 0) return;
+                  const MAX_SIZE = 5 * 1024 * 1024;
+                  const invalid = files.find(f => f.size > MAX_SIZE);
+                  if (invalid) { alert(`"${invalid.name}" es muy grande. Máximo 5MB por imagen.`); return; }
+                  setUploading(true);
                   try {
                     const urls = await Promise.all(files.map(f => StorageService.uploadImage(f, 'products')));
                     setFormData(prev => ({ ...prev, images: [...(prev.images || []).filter(i => i !== ''), ...urls] }));
-                  } catch (err) { console.error('Upload error:', err); alert('Error al subir imagen'); }
+                  } catch (err) { console.error('Upload error:', err); alert('Error al subir imagen. Verificá tu conexión.'); }
+                  setUploading(false);
                 }} />
               </label>
               {formData.images && formData.images.filter(i => i).length > 0 && (
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {formData.images.filter(i => i).map((img, idx) => (
                     <div key={idx} className="relative group">
-                      <img src={processImageUrl(img, 100)} className="w-16 h-16 object-cover rounded border" alt="" />
+                      <img src={processImageUrl(img, 100)} className="w-16 h-16 object-cover rounded border" alt={`Imagen ${idx + 1}`} />
                       <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: (prev.images || []).filter((_, i) => i !== idx) }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition">×</button>
                     </div>
                   ))}
@@ -875,7 +898,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               <label className="text-xs text-leather-400 mt-2 block">O pega URLs directamente:</label>
               <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm font-mono mt-1" value={Array.isArray(formData.images) ? formData.images.join('\n') : ''} onChange={e => setFormData({...formData, images: e.target.value.split('\n')})} />
             </div>
-            <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setEditingProduct(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
+            <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setEditingProduct(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" disabled={uploading} className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold disabled:opacity-50">Guardar</button></div>
           </form>
       </div></div>
     );
@@ -923,7 +946,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                   {categories.map(cat => (
                     <div key={cat} className="flex justify-between items-center p-4 bg-leather-50 rounded-lg border border-leather-100">
                       <span className="font-bold text-leather-900">{cat}</span>
-                      {cat !== 'Todas' && <button onClick={() => deleteCategory(cat)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={18}/></button>}
+                      {cat !== 'Todas' && <button onClick={() => { if(confirm('¿Eliminar categoría?')) deleteCategory(cat); }} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={18}/></button>}
                     </div>
                   ))}
                 </div>
@@ -941,7 +964,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                         <span className="text-xs text-leather-500">{p.category}</span>
                       </div>
                     </div>
-                    <div className="flex gap-2"><button onClick={() => setEditingProduct(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => deleteProduct(p.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
+                    <div className="flex gap-2"><button onClick={() => setEditingProduct(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => { if(confirm('¿Eliminar este producto?')) deleteProduct(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
                   </div>
                 ))}</div>
                 {editingProduct && <ProductForm />}
@@ -956,7 +979,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                         <span className="font-bold text-leather-900 block">{f.name}</span>
                         <span className="text-sm text-leather-500">{f.date} - {f.city}</span>
                       </div>
-                      <div className="flex gap-2"><button onClick={() => setEditingFair(f)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => deleteFair(f.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
+                      <div className="flex gap-2"><button onClick={() => setEditingFair(f)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => { if(confirm('¿Eliminar esta feria?')) deleteFair(f.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
                    </div>
                  ))}</div>
                  {editingFair && (
@@ -992,16 +1015,21 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                   <div className="grid gap-4">{blogPosts.map(p => (
                     <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white">
                        <span className="font-bold text-leather-900">{p.title}</span>
-                       <div className="flex gap-2"><button onClick={() => setEditingBlog(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => deleteBlogPost(p.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
+                       <div className="flex gap-2"><button onClick={() => setEditingBlog(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => { if(confirm('¿Eliminar este post?')) deleteBlogPost(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
                     </div>
                   ))}</div>
                   {editingBlog && (
                     <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200">
                       <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">Editar Post</h3>
-                      <form onSubmit={(e) => { e.preventDefault(); const b = { ...editingBlog, id: editingBlog.id || Date.now().toString() } as BlogPost; if(editingBlog.id) updateBlogPost(b); else addBlogPost(b); setEditingBlog(null); }} className="space-y-4">
-                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Título" value={editingBlog.title || ''} onChange={e => setEditingBlog({...editingBlog, title: e.target.value})} />
-                        <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-32" placeholder="Contenido" value={editingBlog.content || ''} onChange={e => setEditingBlog({...editingBlog, content: e.target.value})} />
-                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Autor" value={editingBlog.author || ''} onChange={e => setEditingBlog({...editingBlog, author: e.target.value})} />
+                      <form onSubmit={(e) => { e.preventDefault(); const b = { ...editingBlog, id: editingBlog.id || Date.now().toString(), excerpt: editingBlog.excerpt || (editingBlog.content || '').substring(0, 150) + '...', date: editingBlog.date || new Date().toLocaleDateString('es-UY', { day: 'numeric', month: 'short', year: 'numeric' }), readTime: editingBlog.readTime || `${Math.max(1, Math.ceil((editingBlog.content || '').split(' ').length / 200))} min lectura` } as BlogPost; if(editingBlog.id) updateBlogPost(b); else addBlogPost(b); setEditingBlog(null); }} className="space-y-4">
+                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Título *" value={editingBlog.title || ''} onChange={e => setEditingBlog({...editingBlog, title: e.target.value})} required />
+                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none text-sm" placeholder="Resumen corto (se genera automáticamente si lo dejás vacío)" value={editingBlog.excerpt || ''} onChange={e => setEditingBlog({...editingBlog, excerpt: e.target.value})} />
+                        <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-32" placeholder="Contenido del artículo *" value={editingBlog.content || ''} onChange={e => setEditingBlog({...editingBlog, content: e.target.value})} required />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Autor" value={editingBlog.author || 'Mariela Calistro'} onChange={e => setEditingBlog({...editingBlog, author: e.target.value})} />
+                          <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none text-sm" placeholder="Fecha (ej: 20 Mar 2025)" value={editingBlog.date || ''} onChange={e => setEditingBlog({...editingBlog, date: e.target.value})} />
+                          <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none text-sm" placeholder="Tiempo lectura (ej: 3 min)" value={editingBlog.readTime || ''} onChange={e => setEditingBlog({...editingBlog, readTime: e.target.value})} />
+                        </div>
                         <div>
                           <label className="text-xs font-bold text-leather-700 mb-1 block">Imagen</label>
                           <label className="flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-3 hover:border-leather-500 transition-colors">
@@ -1026,7 +1054,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                   <div className="grid gap-4">{history.map(p => (
                     <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white">
                        <span className="font-bold text-leather-900">{p.year} - {p.title}</span>
-                       <div className="flex gap-2"><button onClick={() => setEditingHistory(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => deleteHistoryEvent(p.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
+                       <div className="flex gap-2"><button onClick={() => setEditingHistory(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => { if(confirm('¿Eliminar este hito?')) deleteHistoryEvent(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
                     </div>
                   ))}</div>
                   {editingHistory && (
@@ -1104,15 +1132,16 @@ const CatalogPage = () => {
         {filtered.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {filtered.map(product => (
-              <div key={product.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all group border border-leather-100">
+              <div key={product.id} className={`bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all group border border-leather-100 ${product.isSoldOut ? 'opacity-75' : ''}`}>
                 <Link to={`/producto/${product.id}`} className="block relative aspect-square overflow-hidden">
-                  <img src={processImageUrl(product.images[0], 400)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt={product.name} loading="lazy" onError={handleImgError} />
+                  <img src={processImageUrl(product.images[0], 400)} className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${product.isSoldOut ? 'grayscale-[30%]' : ''}`} alt={product.name} loading="lazy" onError={handleImgError} />
+                  {product.isSoldOut && <div className="absolute inset-0 flex items-center justify-center"><span className="bg-red-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg uppercase tracking-wider">Agotado</span></div>}
                 </Link>
                 <div className="p-4">
                   <Link to={`/producto/${product.id}`}><h3 className="font-bold text-lg text-leather-900 mb-2">{product.name}</h3></Link>
                   <div className="flex justify-between items-center">
-                    <span className="text-leather-600 font-bold">{currency} {convertPrice(product.priceUYU).toLocaleString()}</span>
-                    <button onClick={() => addToCart(product)} className="p-2 bg-leather-50 rounded-full hover:bg-leather-900 hover:text-white transition-colors border border-leather-100"><ShoppingBag size={18} /></button>
+                    <span className={`font-bold ${product.isSoldOut ? 'text-leather-400 line-through' : 'text-leather-600'}`}>{currency} {convertPrice(product.priceUYU).toLocaleString()}</span>
+                    {!product.isSoldOut && <button onClick={() => addToCart(product)} className="p-2 bg-leather-50 rounded-full hover:bg-leather-900 hover:text-white transition-colors border border-leather-100" aria-label="Agregar al carrito"><ShoppingBag size={18} /></button>}
                   </div>
                 </div>
               </div>
@@ -1431,18 +1460,20 @@ const App = () => {
           <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
           <Navbar toggleCart={toggleCart} />
           <FloatingWhatsApp />
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/catalogo" element={<CatalogPage />} />
-            <Route path="/historia" element={<HistoryPage />} />
-            <Route path="/blog" element={<BlogPage />} />
-            <Route path="/blog/:id" element={<BlogPage />} />
-            <Route path="/ferias" element={<FairsPage />} />
-            <Route path="/producto/:id" element={<ProductDetail />} />
-            <Route path="/admin" element={<AdminPanel />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+          <main>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/catalogo" element={<CatalogPage />} />
+              <Route path="/historia" element={<HistoryPage />} />
+              <Route path="/blog" element={<BlogPage />} />
+              <Route path="/blog/:id" element={<BlogPage />} />
+              <Route path="/ferias" element={<FairsPage />} />
+              <Route path="/producto/:id" element={<ProductDetail />} />
+              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </main>
           <Footer />
         </HashRouter>
       </StoreProvider>
