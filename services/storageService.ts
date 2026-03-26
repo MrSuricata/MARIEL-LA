@@ -1,5 +1,6 @@
 import { Product, Fair, HistoryEvent, BlogPost } from '../types';
 import { supabase } from './supabaseClient';
+import { INITIAL_PRODUCTS, INITIAL_FAIRS, INITIAL_HISTORY, INITIAL_BLOG_POSTS, INITIAL_CATEGORIES } from '../constants';
 
 // --- Mappers: DB snake_case <-> TS camelCase ---
 
@@ -117,8 +118,8 @@ export const StorageService = {
   // Products
   getProducts: async (): Promise<Product[]> => {
     const { data, error } = await supabase.from('products').select('*').order('created_at');
-    if (error) { console.error('Error fetching products:', error); return []; }
-    return (data || []).map(dbToProduct);
+    if (error) { console.error('Error fetching products:', error); return INITIAL_PRODUCTS; }
+    return data && data.length > 0 ? data.map(dbToProduct) : INITIAL_PRODUCTS;
   },
 
   saveProduct: async (product: Product): Promise<void> => {
@@ -134,8 +135,8 @@ export const StorageService = {
   // Fairs
   getFairs: async (): Promise<Fair[]> => {
     const { data, error } = await supabase.from('fairs').select('*').order('created_at');
-    if (error) { console.error('Error fetching fairs:', error); return []; }
-    return (data || []).map(dbToFair);
+    if (error) { console.error('Error fetching fairs:', error); return INITIAL_FAIRS; }
+    return data && data.length > 0 ? data.map(dbToFair) : INITIAL_FAIRS;
   },
 
   saveFair: async (fair: Fair): Promise<void> => {
@@ -151,8 +152,8 @@ export const StorageService = {
   // History
   getHistory: async (): Promise<HistoryEvent[]> => {
     const { data, error } = await supabase.from('history_events').select('*').order('created_at');
-    if (error) { console.error('Error fetching history:', error); return []; }
-    return (data || []).map(dbToHistory);
+    if (error) { console.error('Error fetching history:', error); return INITIAL_HISTORY; }
+    return data && data.length > 0 ? data.map(dbToHistory) : INITIAL_HISTORY;
   },
 
   saveHistoryEvent: async (event: HistoryEvent): Promise<void> => {
@@ -168,8 +169,8 @@ export const StorageService = {
   // Blog Posts
   getBlogPosts: async (): Promise<BlogPost[]> => {
     const { data, error } = await supabase.from('blog_posts').select('*').order('created_at');
-    if (error) { console.error('Error fetching blog posts:', error); return []; }
-    return (data || []).map(dbToBlogPost);
+    if (error) { console.error('Error fetching blog posts:', error); return INITIAL_BLOG_POSTS; }
+    return data && data.length > 0 ? data.map(dbToBlogPost) : INITIAL_BLOG_POSTS;
   },
 
   saveBlogPost: async (post: BlogPost): Promise<void> => {
@@ -185,8 +186,8 @@ export const StorageService = {
   // Categories
   getCategories: async (): Promise<string[]> => {
     const { data, error } = await supabase.from('categories').select('name').order('sort_order');
-    if (error) { console.error('Error fetching categories:', error); return []; }
-    return (data || []).map((r: any) => r.name);
+    if (error) { console.error('Error fetching categories:', error); return INITIAL_CATEGORIES; }
+    return data && data.length > 0 ? data.map((r: any) => r.name) : INITIAL_CATEGORIES;
   },
 
   addCategory: async (name: string): Promise<void> => {

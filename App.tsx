@@ -36,6 +36,7 @@ const processImageUrl = (url: string, size: number = 800): string => {
 
 const FALLBACK_IMG = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect fill="#f5ead6" width="400" height="400"/><text x="200" y="200" text-anchor="middle" fill="#9b4d23" font-family="serif" font-size="18">MARIEL\'LA</text></svg>');
 const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => { e.currentTarget.src = FALLBACK_IMG; };
+const safeImg = (images: string[] | undefined, index: number = 0): string => (images && images.length > index) ? images[index] : '';
 
 // --- Reveal Animation Component ---
 const Reveal: React.FC<{ children: ReactNode; delay?: number }> = ({ children, delay = 0 }) => {
@@ -632,13 +633,18 @@ const ContactSection = () => (
 
 const BlogPage = () => {
   const { blogPosts } = useStore();
-  const [selectedPost, setSelectedPost] = useState<string | null>(null);
+  const { id: urlPostId } = useParams();
+  const [selectedPost, setSelectedPost] = useState<string | null>(urlPostId || null);
 
-  useEffect(() => { 
+  useEffect(() => {
+    if (urlPostId) setSelectedPost(urlPostId);
+  }, [urlPostId]);
+
+  useEffect(() => {
     window.scrollTo(0,0);
-    document.title = selectedPost 
-      ? `${blogPosts.find(p=>p.id===selectedPost)?.title} - MARIEL'LA` 
-      : "Blog - MARIEL'LA"; 
+    document.title = selectedPost
+      ? `${blogPosts.find(p=>p.id===selectedPost)?.title} - MARIEL'LA`
+      : "Blog - MARIEL'LA";
   }, [selectedPost, blogPosts]);
 
   if (selectedPost) {
@@ -651,7 +657,7 @@ const BlogPage = () => {
           <span className="text-leather-600 font-bold uppercase text-xs tracking-wider mb-2 block">{post.date} • {post.readTime}</span>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-leather-900 mb-8 leading-tight">{post.title}</h1>
           <div className="aspect-video w-full rounded-xl overflow-hidden mb-10 shadow-lg border border-leather-200">
-            <img src={processImageUrl(post.imageUrl, 1200)} alt="" className="w-full h-full object-cover" />
+            <img src={processImageUrl(post.imageUrl, 1200)} alt={post.title} className="w-full h-full object-cover" onError={handleImgError} />
           </div>
           <div className="prose prose-lg prose-stone mx-auto text-leather-800 leading-relaxed font-serif">
              <p className="font-bold text-xl mb-6 text-leather-900">{post.excerpt}</p>
@@ -714,7 +720,16 @@ const ProductDetail = () => {
     if (product) document.title = `${product.name} - MARIEL'LA`;
   }, [product]);
 
-  if (!product) return <div className="text-center py-40">Producto no encontrado</div>;
+  if (!product) return (
+    <div className="min-h-screen flex items-center justify-center bg-leather-50 pt-20">
+      <div className="text-center px-4">
+        <ShoppingBag size={48} className="mx-auto text-leather-200 mb-4" />
+        <h2 className="text-2xl font-serif font-bold text-leather-900 mb-2">Producto no encontrado</h2>
+        <p className="text-leather-500 mb-6">Este producto ya no está disponible o fue removido.</p>
+        <Link to="/catalogo" className="bg-leather-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-leather-800 transition">Ver catálogo</Link>
+      </div>
+    </div>
+  );
   const currentImageUrl = processImageUrl(product.images[selectedImg], 1200);
   const highResImageUrl = processImageUrl(product.images[selectedImg], 2400);
 
@@ -1149,7 +1164,11 @@ const CatalogPage = () => {
           </div>
         ) : (
           <div className="text-center py-20">
-            <p className="text-leather-500 text-lg font-medium">No se encontraron productos que coincidan con tu búsqueda.</p>
+            <Search size={48} className="mx-auto text-leather-200 mb-4" />
+            <p className="text-leather-500 text-lg font-medium mb-4">No se encontraron productos.</p>
+            {(searchTerm || filter !== 'Todas') && (
+              <button onClick={() => { setSearchTerm(''); setFilter('Todas'); }} className="text-leather-800 font-bold border-b border-leather-800 hover:text-leather-600 hover:border-leather-600 transition-colors">Ver todos los productos</button>
+            )}
           </div>
         )}
       </div>
