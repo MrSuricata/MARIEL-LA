@@ -376,7 +376,7 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
           <div className={`hidden md:flex items-center space-x-8 ${!scrolled && location.pathname === '/' ? 'px-8 py-3 rounded-full backdrop-blur-[2px]' : ''}`}>
             <NavLink label="Inicio" to="/" />
             <NavLink label="Tienda" to="/catalogo" />
-            {/* Historia hidden */}
+            <NavLink label="Mariela" to="/nosotros" />
             <NavLink label="Descubre" to="/blog" />
             <NavLink label="Ferias" to="/ferias" />
             <NavLink label="Contacto" to="#contacto" isAnchor={true} />
@@ -403,7 +403,7 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
         <div className="md:hidden absolute top-0 left-0 w-full h-screen bg-leather-50 flex flex-col items-center justify-center space-y-8 z-40">
             <Link to="/" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Inicio</Link>
             <Link to="/catalogo" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Tienda</Link>
-            {/* Historia Hidden */}
+            <Link to="/nosotros" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Mariela</Link>
             <Link to="/blog" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Descubre</Link>
             <Link to="/ferias" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Ferias</Link>
             <a href="#contacto" onClick={(e) => handleNavClick(e, '#contacto', true)} className="text-leather-900 font-bold text-xl">Contacto</a>
@@ -482,13 +482,110 @@ const DiscoverSection = () => {
   );
 };
 
+// --- About Mariela Section ---
+const AboutMariela = () => {
+  useEffect(() => { document.title = "Conoce a Mariela - MARIEL'LA"; }, []);
+
+  return (
+    <section className="py-24 bg-white border-t border-leather-100 scroll-mt-20">
+      <div className="max-w-7xl mx-auto px-4">
+        <Reveal>
+          <div className="text-center mb-16">
+            <span className="text-leather-600 uppercase tracking-widest text-xs font-bold">La Artesana</span>
+            <h2 className="text-4xl md:text-5xl font-serif font-bold text-leather-900 mt-2">Conoce a Mariela</h2>
+          </div>
+        </Reveal>
+
+        {/* Main Story - Two Column */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-20">
+          {/* Left: Photo Collage */}
+          <Reveal>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="aspect-[3/4] rounded-2xl overflow-hidden shadow-lg border border-leather-100">
+                  <img src={processImageUrl("https://drive.google.com/file/d/1nMQHF1eWwDKQsQL-Fggx1lbex5V0nZ3b/view?usp=drive_link", 600)} alt="Mariela Calistro" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+                </div>
+                <div className="aspect-[3/4] rounded-2xl overflow-hidden shadow-lg border border-leather-100">
+                  <img src="/fotos/familia/pablo-calistro-con-hijas.jpg" alt="Pablo Calistro con sus hijas" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" onError={handleImgError} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-lg border border-leather-100">
+                  <img src="/fotos/familia/pablo-y-esposa-retrato.jpg" alt="Pablo y Maris Ferreira" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" onError={handleImgError} />
+                </div>
+                <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-lg border border-leather-100">
+                  <img src="/fotos/familia/familia-grupo-jardin.jpg" alt="Familia Calistro" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" onError={handleImgError} />
+                </div>
+              </div>
+              <p className="text-center text-xs text-leather-400 italic mt-2">La familia Calistro Ferreira: tradición artesanal de generaciones</p>
+            </div>
+          </Reveal>
+
+          {/* Right: Story */}
+          <Reveal delay={200}>
+            <div className="flex flex-col justify-center">
+              <div className="inline-flex items-center gap-2 bg-leather-50 px-4 py-2 rounded-full border border-leather-100 self-start mb-6">
+                <Heart size={16} className="text-red-500 fill-current" />
+                <span className="text-leather-700 text-sm font-bold">Mariela Calistro Ferreira</span>
+              </div>
+
+              <h3 className="text-3xl font-serif font-bold text-leather-900 mb-6 leading-tight">Una vida entre telas, cuero y creatividad</h3>
+
+              <div className="space-y-4 text-leather-700 leading-relaxed font-medium">
+                <p>Mariela creció en Montevideo rodeada de agujas, hilos y el aroma del cuero. Su padre, <strong>Pablo Calistro</strong>, fundador de la tapicería <strong>TAPIPOCITOS</strong>, y su madre <strong>Maris Ferreira</strong>, costurera de toda la vida, le enseñaron que crear con las manos es mucho más que un oficio: es una forma de vivir.</p>
+
+                <p>Desde chica aprendió a mirar las texturas, a sentir la diferencia entre un cuero genuino y una imitación, a respetar cada material. Esa herencia familiar se convirtió en su pasión: <strong>diseñar piezas únicas</strong> que cuenten una historia.</p>
+
+                <p>Hoy Mariela trabaja desde Piriápolis, acompañada de sus fieles máquinas de coser, junto a <strong>Johnny</strong>, su compañero de vida, y <strong>Brian</strong>, su hijo. Cada cartera, cada bolso, cada accesorio que sale de sus manos es <strong>irrepetible</strong> — no existen dos piezas exactamente iguales.</p>
+              </div>
+
+              <div className="mt-8 p-6 bg-leather-50 rounded-xl border border-leather-100">
+                <p className="text-leather-800 font-serif italic text-lg leading-relaxed">"Me encanta crear, diseñar, inventar. Cada pieza que hago lleva un pedazo de mi historia y la de mi familia."</p>
+                <p className="text-leather-600 font-bold mt-3 text-sm">— Mariela Calistro</p>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+
+        {/* Values Strip */}
+        <Reveal>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { icon: <Hammer size={24} />, title: 'Hecho a Mano', desc: 'Cada pieza es artesanal, sin producción en serie' },
+              { icon: <Heart size={24} />, title: 'Piezas Únicas', desc: 'No existen dos productos exactamente iguales' },
+              { icon: <ScrollText size={24} />, title: 'Herencia Familiar', desc: 'Tradición artesanal de generaciones' },
+              { icon: <Truck size={24} />, title: 'Envíos a Todo el País', desc: 'Desde Piriápolis a donde estés' },
+            ].map((val, i) => (
+              <div key={i} className="text-center p-6 bg-leather-50 rounded-xl border border-leather-100 hover:shadow-lg transition-all group">
+                <div className="w-12 h-12 bg-leather-900 text-leather-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-leather-700 transition-colors">{val.icon}</div>
+                <h4 className="font-bold text-leather-900 mb-2">{val.title}</h4>
+                <p className="text-leather-600 text-sm font-medium">{val.desc}</p>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+};
+
+// --- About Page Wrapper ---
+const AboutPage = () => {
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+  return (
+    <div className="pt-24 animate-fade-in-up">
+      <AboutMariela />
+    </div>
+  );
+};
+
 const HomePage = () => {
   useEffect(() => { document.title = "MARIEL'LA | Artesanía en Cuero"; }, []);
   return (
     <div className="animate-fade-in-up scroll-smooth">
       <HeroSection />
       <Reveal><FeaturedCarousel /></Reveal>
-      {/* History Section Hidden */}
+      <AboutMariela />
       <DiscoverSection />
       <Reveal><FairsTeaser /></Reveal>
       <Reveal><ContactSection /></Reveal>
@@ -1397,6 +1494,7 @@ const Footer = () => (
         <h4 className="text-white font-bold mb-4 text-sm uppercase tracking-wider">Tienda</h4>
         <ul className="space-y-3 text-sm font-medium">
           <li><Link to="/catalogo" className="hover:text-white transition-colors">Colección</Link></li>
+          <li><Link to="/nosotros" className="hover:text-white transition-colors">Conoce a Mariela</Link></li>
           <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
           <li><Link to="/ferias" className="hover:text-white transition-colors">Ferias</Link></li>
         </ul>
@@ -1483,7 +1581,8 @@ const App = () => {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/catalogo" element={<CatalogPage />} />
-              <Route path="/historia" element={<HistoryPage />} />
+              <Route path="/nosotros" element={<AboutPage />} />
+            <Route path="/historia" element={<HistoryPage />} />
               <Route path="/blog" element={<BlogPage />} />
               <Route path="/blog/:id" element={<BlogPage />} />
               <Route path="/ferias" element={<FairsPage />} />
