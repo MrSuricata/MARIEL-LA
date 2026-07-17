@@ -11,6 +11,7 @@ export interface Product {
   dimensions: string;
   isFeatured: boolean;
   isSoldOut?: boolean;
+  createdAt?: string;
 }
 
 export interface CartItem extends Product {
@@ -41,7 +42,7 @@ export interface BlogPost {
   id: string;
   title: string;
   excerpt: string;
-  content: string; // HTML or Markdown supported roughly
+  content: string; // Párrafos separados por saltos de línea
   author: string;
   date: string;
   imageUrl: string;

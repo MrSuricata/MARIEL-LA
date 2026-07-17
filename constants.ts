@@ -8,7 +8,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     priceUYU: 5800,
     priceUSD: 145,
     category: 'Carteras',
-    images: ['https://drive.google.com/file/d/1anp427tiOl9TOxnBmLpendcxQqixPJ5B/view?usp=drive_link'],
+    images: ['https://scftuxrtflfowohiewsc.supabase.co/storage/v1/object/public/mariella/seed/producto-boho-chic.jpg'],
     materials: ['Cuero azul y gris', 'Flecos de cuero amarillo', 'Incrustación turquesa'],
     colors: ['Azul', 'Gris', 'Amarillo'],
     dimensions: '35cm x 30cm x 12cm',
@@ -21,7 +21,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     priceUYU: 6500,
     priceUSD: 160,
     category: 'Carteras',
-    images: ['https://drive.google.com/file/d/14iwM_Ve8_i570wAU724w2x4W1GRViOVV/view?usp=drive_link'],
+    images: ['https://scftuxrtflfowohiewsc.supabase.co/storage/v1/object/public/mariella/seed/producto-serpiente-rosa.jpg'],
     materials: ['Cuero texturizado serpiente', 'Herrajes metálicos'],
     colors: ['Rosa Fucsia'],
     dimensions: '32cm x 28cm x 10cm',
@@ -34,7 +34,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     priceUYU: 8900,
     priceUSD: 220,
     category: 'Accesorios',
-    images: ['https://drive.google.com/file/d/1kEYWlpPGrf-mUAK605m00SCbR5kapSLm/view?usp=drive_link'],
+    images: ['https://scftuxrtflfowohiewsc.supabase.co/storage/v1/object/public/mariella/seed/producto-duffel-marron.jpg'],
     materials: ['Cuero marrón robusto', 'Metal envejecido'],
     colors: ['Marrón'],
     dimensions: '50cm x 30cm x 25cm',
@@ -72,21 +72,21 @@ export const INITIAL_HISTORY: HistoryEvent[] = [
     year: "Los inicios",
     title: "Herencia Familiar",
     description: "Mariela creció rodeada de cuero y tela en Montevideo. Su padre Pablo Calistro, tapicero del taller TAPIPOCITOS, y su madre Maris Ferreira, costurera toda la vida, le transmitieron el amor por trabajar con las manos y crear con materiales nobles.",
-    imageUrl: "https://images.unsplash.com/photo-1605218427368-35b158650a64?w=800"
+    imageUrl: "/fotos/familia/pablo-y-esposa-retrato.jpg"
   },
   {
     id: 'h2',
     year: "El camino",
     title: "El Oficio Propio",
     description: "Con los años, Mariela encontró su propia voz en la artesanía. Aprendió que el cuero tiene memoria, que cada pieza respira. Se especializó en crear piezas únicas, fusionando la tradición familiar con su visión creativa personal.",
-    imageUrl: "https://images.unsplash.com/photo-1598532163257-52648740d12e?w=800"
+    imageUrl: "/fotos/familia/familia-grupo-jardin.jpg"
   },
   {
     id: 'h3',
     year: "Hoy",
     title: "MARIEL'LA",
     description: "Desde Piriápolis y en ferias por todo el país, MARIEL'LA representa la esencia de la artesanía uruguaya. Cada pieza es única e irrepetible, hecha a mano por Mariela con sus fieles máquinas de coser. No somos una fábrica; somos un taller donde cada cliente se lleva una parte de nuestra historia.",
-    imageUrl: "https://images.unsplash.com/photo-1473188588951-e5d7eda7b6ac?w=800"
+    imageUrl: "/fotos/familia/familia-celebracion-fiesta.jpg"
   }
 ];
 
@@ -99,7 +99,7 @@ export const INITIAL_BLOG_POSTS: BlogPost[] = [
     author: "Mariela Calistro",
     date: "20 Mar 2026",
     readTime: "2 min lectura",
-    imageUrl: "https://drive.google.com/file/d/1p0rhmnjphBl7F9ZVFLl-PagsD1YYysTt/view?usp=drive_link"
+    imageUrl: "https://scftuxrtflfowohiewsc.supabase.co/storage/v1/object/public/mariella/seed/blog-am770.jpg"
   },
   {
     id: 'b1',
@@ -109,7 +109,7 @@ export const INITIAL_BLOG_POSTS: BlogPost[] = [
     author: "Mariela Calistro",
     date: "15 Ene 2026",
     readTime: "3 min lectura",
-    imageUrl: "https://drive.google.com/file/d/1qeN28si1WAj_TmotiGxcENBATPK1Ugze/view?usp=drive_link"
+    imageUrl: "https://scftuxrtflfowohiewsc.supabase.co/storage/v1/object/public/mariella/seed/blog-cuero-identidad.jpg"
   },
   {
     id: 'b2',
@@ -129,7 +129,7 @@ export const INITIAL_BLOG_POSTS: BlogPost[] = [
     author: "Mariela Calistro",
     date: "10 Mar 2026",
     readTime: "2 min lectura",
-    imageUrl: "https://drive.google.com/file/d/1A8uunxmriIof4e23Zr1xO7HdmIVdHTuY/view?usp=drive_link"
+    imageUrl: "https://scftuxrtflfowohiewsc.supabase.co/storage/v1/object/public/mariella/seed/blog-cuidar-cuero.jpg"
   }
 ];
 

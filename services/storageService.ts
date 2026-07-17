@@ -2,6 +2,20 @@ import { Product, Fair, HistoryEvent, BlogPost } from '../types';
 import { supabase } from './supabaseClient';
 import { INITIAL_PRODUCTS, INITIAL_FAIRS, INITIAL_HISTORY, INITIAL_BLOG_POSTS, INITIAL_CATEGORIES } from '../constants';
 
+// Tablas del tenant MARIEL'LA dentro del proyecto compartido
+const T = {
+  products: 'mariella_products',
+  fairs: 'mariella_fairs',
+  history: 'mariella_history_events',
+  blog: 'mariella_blog_posts',
+  categories: 'mariella_categories',
+} as const;
+
+const BUCKET = 'mariella';
+
+// Usuario único de administración (Mariela solo ingresa su contraseña)
+export const ADMIN_EMAIL = 'admin@mariel-la.vercel.app';
+
 // --- Mappers: DB snake_case <-> TS camelCase ---
 
 function dbToProduct(row: any): Product {
@@ -18,6 +32,7 @@ function dbToProduct(row: any): Product {
     dimensions: row.dimensions,
     isFeatured: row.is_featured,
     isSoldOut: row.is_sold_out || false,
+    createdAt: row.created_at,
   };
 }
 
@@ -35,6 +50,7 @@ function productToDb(p: Product): any {
     dimensions: p.dimensions,
     is_featured: p.isFeatured,
     is_sold_out: p.isSoldOut || false,
+    // created_at se omite: lo define la base al insertar
   };
 }
 
@@ -112,106 +128,148 @@ function blogPostToDb(b: BlogPost): any {
   };
 }
 
+// Escrituras: si falla, se lanza el error para que la UI avise (nada de fallos silenciosos)
+function throwIfError(error: { message: string } | null, action: string): void {
+  if (error) {
+    console.error(`Error ${action}:`, error);
+    throw new Error(`${action}: ${error.message}`);
+  }
+}
+
 // --- Storage Service (Supabase) ---
+// Lecturas: si la base no responde se usa el contenido inicial (la web nunca
+// queda vacía por un problema de conexión). Si responde y está vacía de
+// verdad, se devuelve vacío: lo que se ve es lo que hay.
 
 export const StorageService = {
   // Products
   getProducts: async (): Promise<Product[]> => {
-    const { data, error } = await supabase.from('products').select('*').order('created_at');
+    const { data, error } = await supabase.from(T.products).select('*').order('created_at');
     if (error) { console.error('Error fetching products:', error); return INITIAL_PRODUCTS; }
-    return data && data.length > 0 ? data.map(dbToProduct) : INITIAL_PRODUCTS;
+    return (data ?? []).map(dbToProduct);
   },
 
   saveProduct: async (product: Product): Promise<void> => {
-    const { error } = await supabase.from('products').upsert(productToDb(product));
-    if (error) console.error('Error saving product:', error);
+    const { error } = await supabase.from(T.products).upsert(productToDb(product));
+    throwIfError(error, 'guardar producto');
   },
 
   deleteProduct: async (id: string): Promise<void> => {
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) console.error('Error deleting product:', error);
+    const { error } = await supabase.from(T.products).delete().eq('id', id);
+    throwIfError(error, 'eliminar producto');
   },
 
   // Fairs
   getFairs: async (): Promise<Fair[]> => {
-    const { data, error } = await supabase.from('fairs').select('*').order('created_at');
+    const { data, error } = await supabase.from(T.fairs).select('*').order('created_at');
     if (error) { console.error('Error fetching fairs:', error); return INITIAL_FAIRS; }
-    return data && data.length > 0 ? data.map(dbToFair) : INITIAL_FAIRS;
+    return (data ?? []).map(dbToFair);
   },
 
   saveFair: async (fair: Fair): Promise<void> => {
-    const { error } = await supabase.from('fairs').upsert(fairToDb(fair));
-    if (error) console.error('Error saving fair:', error);
+    const { error } = await supabase.from(T.fairs).upsert(fairToDb(fair));
+    throwIfError(error, 'guardar feria');
   },
 
   deleteFair: async (id: string): Promise<void> => {
-    const { error } = await supabase.from('fairs').delete().eq('id', id);
-    if (error) console.error('Error deleting fair:', error);
+    const { error } = await supabase.from(T.fairs).delete().eq('id', id);
+    throwIfError(error, 'eliminar feria');
   },
 
   // History
   getHistory: async (): Promise<HistoryEvent[]> => {
-    const { data, error } = await supabase.from('history_events').select('*').order('created_at');
+    const { data, error } = await supabase.from(T.history).select('*').order('created_at');
     if (error) { console.error('Error fetching history:', error); return INITIAL_HISTORY; }
-    return data && data.length > 0 ? data.map(dbToHistory) : INITIAL_HISTORY;
+    return (data ?? []).map(dbToHistory);
   },
 
   saveHistoryEvent: async (event: HistoryEvent): Promise<void> => {
-    const { error } = await supabase.from('history_events').upsert(historyToDb(event));
-    if (error) console.error('Error saving history event:', error);
+    const { error } = await supabase.from(T.history).upsert(historyToDb(event));
+    throwIfError(error, 'guardar hito');
   },
 
   deleteHistoryEvent: async (id: string): Promise<void> => {
-    const { error } = await supabase.from('history_events').delete().eq('id', id);
-    if (error) console.error('Error deleting history event:', error);
+    const { error } = await supabase.from(T.history).delete().eq('id', id);
+    throwIfError(error, 'eliminar hito');
   },
 
   // Blog Posts
   getBlogPosts: async (): Promise<BlogPost[]> => {
-    const { data, error } = await supabase.from('blog_posts').select('*').order('created_at');
+    const { data, error } = await supabase.from(T.blog).select('*').order('created_at');
     if (error) { console.error('Error fetching blog posts:', error); return INITIAL_BLOG_POSTS; }
-    return data && data.length > 0 ? data.map(dbToBlogPost) : INITIAL_BLOG_POSTS;
+    return (data ?? []).map(dbToBlogPost);
   },
 
   saveBlogPost: async (post: BlogPost): Promise<void> => {
-    const { error } = await supabase.from('blog_posts').upsert(blogPostToDb(post));
-    if (error) console.error('Error saving blog post:', error);
+    const { error } = await supabase.from(T.blog).upsert(blogPostToDb(post));
+    throwIfError(error, 'guardar post');
   },
 
   deleteBlogPost: async (id: string): Promise<void> => {
-    const { error } = await supabase.from('blog_posts').delete().eq('id', id);
-    if (error) console.error('Error deleting blog post:', error);
+    const { error } = await supabase.from(T.blog).delete().eq('id', id);
+    throwIfError(error, 'eliminar post');
   },
 
   // Categories
   getCategories: async (): Promise<string[]> => {
-    const { data, error } = await supabase.from('categories').select('name').order('sort_order');
+    const { data, error } = await supabase.from(T.categories).select('name').order('sort_order');
     if (error) { console.error('Error fetching categories:', error); return INITIAL_CATEGORIES; }
-    return data && data.length > 0 ? data.map((r: any) => r.name) : INITIAL_CATEGORIES;
+    return (data ?? []).map((r: any) => r.name);
   },
 
   addCategory: async (name: string): Promise<void> => {
-    const { data: maxRow } = await supabase.from('categories').select('sort_order').order('sort_order', { ascending: false }).limit(1);
+    const { data: maxRow, error: readError } = await supabase
+      .from(T.categories).select('sort_order').order('sort_order', { ascending: false }).limit(1);
+    throwIfError(readError, 'agregar categoría');
     const nextOrder = (maxRow && maxRow[0] ? maxRow[0].sort_order : 0) + 1;
-    const { error } = await supabase.from('categories').insert({ name, sort_order: nextOrder });
-    if (error) console.error('Error adding category:', error);
+    const { error } = await supabase.from(T.categories).insert({ name, sort_order: nextOrder });
+    throwIfError(error, 'agregar categoría');
   },
 
   deleteCategory: async (name: string): Promise<void> => {
-    const { error } = await supabase.from('categories').delete().eq('name', name);
-    if (error) console.error('Error deleting category:', error);
+    const { error } = await supabase.from(T.categories).delete().eq('name', name);
+    throwIfError(error, 'eliminar categoría');
   },
 
   // Image Upload
   uploadImage: async (file: File, folder: string = 'products'): Promise<string> => {
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const fileName = `${folder}/${Date.now()}-${safeName}`;
-    const { error } = await supabase.storage.from('images').upload(fileName, file, {
+    const { error } = await supabase.storage.from(BUCKET).upload(fileName, file, {
       cacheControl: '31536000',
       upsert: false,
     });
-    if (error) throw error;
-    const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+    if (error) {
+      console.error('Error uploading image:', error);
+      throw new Error(`subir imagen: ${error.message}`);
+    }
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
     return data.publicUrl;
+  },
+};
+
+// --- Auth (Supabase) ---
+// La contraseña se valida en el servidor. La sesión persiste entre visitas.
+
+export const AuthService = {
+  signIn: async (password: string): Promise<void> => {
+    const { error } = await supabase.auth.signInWithPassword({ email: ADMIN_EMAIL, password });
+    if (error) throw new Error(error.message);
+  },
+
+  signOut: async (): Promise<void> => {
+    await supabase.auth.signOut();
+  },
+
+  // Notifica el estado actual y cada cambio de sesión. Devuelve el unsubscribe.
+  onAdminChange: (callback: (isAdmin: boolean) => void): (() => void) => {
+    const isAdminSession = (session: { user?: { email?: string } } | null) =>
+      !!session?.user?.email && session.user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+    supabase.auth.getSession().then(({ data }) => callback(isAdminSession(data.session)));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      callback(isAdminSession(session));
+    });
+    return () => sub.subscription.unsubscribe();
   },
 };

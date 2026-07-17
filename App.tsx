@@ -1,14 +1,20 @@
-import React, { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
-import { HashRouter, Routes, Route, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { 
-  ShoppingBag, Menu, X, Instagram, Mail, Phone, MapPin, 
-  Star, Trash2, Edit, Plus, Minus, Search, ExternalLink, Settings, LogOut, Image as ImageIcon,
-  CheckCircle, ArrowRight, Hammer, Heart, ScrollText, Calendar, Clock, Map, ChevronLeft, ChevronRight,
-  ZoomIn, Maximize2, Truck, CreditCard, BookOpen, MessageCircle, Copy, Database, XCircle, Tag
+import React, { useState, useEffect, createContext, useContext, ReactNode, useRef, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+  ShoppingBag, Menu, X, Instagram, Phone, MapPin,
+  Star, Trash2, Edit, Plus, Minus, Search, Settings, LogOut,
+  CheckCircle, ArrowRight, Hammer, Heart, ScrollText, ChevronLeft, ChevronRight,
+  Maximize2, Truck, MessageCircle, Copy, Database, XCircle, Upload,
+  AlertCircle, HelpCircle, Share2, ArrowUp, Eye, EyeOff, Sparkles, Package, Calendar, Info
 } from 'lucide-react';
 import { Product, CartItem, Fair, Currency, HistoryEvent, BlogPost } from './types';
-import { StorageService } from './services/storageService';
-import { Upload } from 'lucide-react';
+import { StorageService, AuthService } from './services/storageService';
+
+// --- Constantes globales ---
+const WHATSAPP_NUMBER = '59898766318';
+const INSTAGRAM_URL = 'https://www.instagram.com/mariellacalistro/';
+const waLink = (text?: string) =>
+  `https://wa.me/${WHATSAPP_NUMBER}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
 
 // --- Utility: Image URL Processor ---
 const processImageUrl = (url: string, size: number = 800): string => {
@@ -24,7 +30,7 @@ const processImageUrl = (url: string, size: number = 800): string => {
   }
   const idMatch = cleanUrl.match(/[-\w]{25,}/);
   if (idMatch && (cleanUrl.includes('drive.google.com') || cleanUrl.includes('docs.google.com'))) {
-    return `https://lh3.googleusercontent.com/d/${idMatch[0]}=s${size}`;
+    return `https://drive.google.com/thumbnail?id=${idMatch[0]}&sz=w${size}`;
   }
   if (cleanUrl.includes('images.unsplash.com')) {
     const urlObj = new URL(cleanUrl);
@@ -37,6 +43,38 @@ const processImageUrl = (url: string, size: number = 800): string => {
 const FALLBACK_IMG = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect fill="#f5ead6" width="400" height="400"/><text x="200" y="200" text-anchor="middle" fill="#9b4d23" font-family="serif" font-size="18">MARIEL\'LA</text></svg>');
 const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => { e.currentTarget.src = FALLBACK_IMG; };
 const safeImg = (images: string[] | undefined, index: number = 0): string => (images && images.length > index) ? images[index] : '';
+
+// src seguro: nunca devuelve string vacío (usa el placeholder de la marca)
+const imgSrc = (images: string[] | undefined, size: number, index: number = 0): string => {
+  const url = safeImg(images, index);
+  return url ? processImageUrl(url, size) : FALLBACK_IMG;
+};
+const imgSrc1 = (url: string | undefined, size: number): string => url ? processImageUrl(url, size) : FALLBACK_IMG;
+
+// Formateo de precios con separador de miles uruguayo
+const formatPrice = (amount: number, currency: Currency): string =>
+  `${currency === 'UYU' ? '$U' : 'US$'} ${amount.toLocaleString('es-UY')}`;
+
+// new Date('YYYY-MM-DD') interpreta UTC y en Uruguay (UTC-3) muestra el día
+// anterior. Parseamos la fecha como local para que el día sea el correcto.
+const parseLocalDate = (dateStr: string): Date => {
+  const parts = (dateStr || '').split('-').map(Number);
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date(dateStr);
+};
+
+// Título + descripción por página
+const usePageMeta = (title: string, description?: string) => {
+  useEffect(() => {
+    document.title = title;
+    if (description) {
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta) meta.setAttribute('content', description);
+    }
+  }, [title, description]);
+};
 
 // --- Reveal Animation Component ---
 const Reveal: React.FC<{ children: ReactNode; delay?: number }> = ({ children, delay = 0 }) => {
@@ -58,8 +96,8 @@ const Reveal: React.FC<{ children: ReactNode; delay?: number }> = ({ children, d
   }, []);
 
   return (
-    <div 
-      ref={ref} 
+    <div
+      ref={ref}
       className={`transition-all duration-1000 ease-out transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
@@ -68,77 +106,88 @@ const Reveal: React.FC<{ children: ReactNode; delay?: number }> = ({ children, d
   );
 };
 
-// --- Scroll To Top Component ---
+// --- Scroll To Top on route change ---
 const ScrollToTop = () => {
   const { pathname } = useLocation();
-
   useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: 'smooth'
-    });
+    window.scrollTo(0, 0);
   }, [pathname]);
-
   return null;
 };
 
-// --- Global Styles ---
-const GlobalStyles = () => (
-  <style>{`
-    html { scroll-behavior: smooth; }
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes zoomFadeIn { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
-    @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
-    @keyframes cartBounce { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
-    .animate-fade-in-up { animation: fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
-    .animate-zoom-fade-in { animation: zoomFadeIn 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-    .animate-slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
-    .animate-cart-bounce { animation: cartBounce 0.4s ease-in-out; }
-    .delay-100 { animation-delay: 150ms; }
-    .delay-200 { animation-delay: 300ms; }
-    .delay-300 { animation-delay: 450ms; }
-    .scrollbar-hide::-webkit-scrollbar { display: none; }
-    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    .leather-patch {
-      background-color: #7f3e23;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.4), inset 0 0 40px rgba(0,0,0,0.2);
+// --- Botón flotante "subir" ---
+const ScrollTopButton = () => {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setVisible(window.scrollY > 600);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  if (!visible) return null;
+  return (
+    <button
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      className="fixed bottom-6 left-6 z-40 bg-white text-leather-900 p-3 rounded-full shadow-xl border border-leather-200 hover:bg-leather-50 transition-all hover:scale-110 animate-fade-in-up"
+      aria-label="Volver arriba"
+    >
+      <ArrowUp size={20} />
+    </button>
+  );
+};
+
+// --- Compatibilidad con links viejos con hash (/#/catalogo → /catalogo) ---
+const HashRedirect = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const { hash } = window.location;
+    if (hash.startsWith('#/')) {
+      navigate(hash.slice(1), { replace: true });
     }
-    .stitch-border {
-      border: 3px dashed #f5ead6; 
-      box-shadow: inset 0 0 2px 1px rgba(0,0,0,0.3), 0 0 1px 0 rgba(255,255,255,0.2); 
-    }
-    .text-stitch {
-      color: #f5ead6;
-      text-shadow: 0px 1px 1px rgba(0,0,0,0.5), 0px 2px 4px rgba(0,0,0,0.3);
-      filter: drop-shadow(0 2px 1px rgba(0,0,0,0.2));
-    }
-    .text-shadow-sm {
-      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-    }
-    
-    /* NUCLEAR OPTION FOR INPUTS */
-    input, textarea, select {
-      background-color: #ffffff !important;
-      color: #111827 !important;
-    }
-    
-    /* Chrome/Edge Autofill Override Hack */
-    input:-webkit-autofill,
-    input:-webkit-autofill:hover, 
-    input:-webkit-autofill:focus, 
-    textarea:-webkit-autofill,
-    textarea:-webkit-autofill:hover,
-    textarea:-webkit-autofill:focus,
-    select:-webkit-autofill,
-    select:-webkit-autofill:hover,
-    select:-webkit-autofill:focus {
-      -webkit-text-fill-color: #111827;
-      -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
-      transition: background-color 5000s ease-in-out 0s;
-    }
-  `}</style>
-);
+  }, [navigate]);
+  return null;
+};
+
+// --- Sistema de Toasts (avisos) ---
+type ToastType = 'success' | 'error' | 'info';
+interface ToastItem { id: number; message: string; type: ToastType; }
+
+const ToastContext = createContext<{ showToast: (message: string, type?: ToastType) => void } | undefined>(undefined);
+const useToast = () => {
+  const context = useContext(ToastContext);
+  if (!context) throw new Error('useToast must be used within a ToastProvider');
+  return context;
+};
+
+const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev.slice(-2), { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, type === 'error' ? 5000 : 2800);
+  }, []);
+
+  return (
+    <ToastContext.Provider value={{ showToast }}>
+      {children}
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] flex flex-col gap-2 items-center pointer-events-none px-4 w-full sm:w-auto" aria-live="polite">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`animate-toast-in flex items-center gap-2 px-5 py-3 rounded-full shadow-2xl text-white text-sm font-bold max-w-full ${
+              toast.type === 'error' ? 'bg-red-600' : toast.type === 'info' ? 'bg-leather-700' : 'bg-leather-900'
+            }`}
+          >
+            {toast.type === 'error' ? <AlertCircle size={18} className="flex-shrink-0" /> : <CheckCircle size={18} className="flex-shrink-0" />}
+            <span className="truncate">{toast.message}</span>
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+};
 
 // --- Store Context ---
 interface StoreContextType {
@@ -150,29 +199,31 @@ interface StoreContextType {
   categories: string[];
   currency: Currency;
   exchangeRate: number;
+  loading: boolean;
+  authReady: boolean;
   convertPrice: (priceUYU: number) => number;
   isAdmin: boolean;
-  login: (password: string) => boolean;
+  login: (password: string) => Promise<boolean>;
   logout: () => void;
   setCurrency: (c: Currency) => void;
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateCartQuantity: (productId: string, delta: number) => void;
   clearCart: () => void;
-  addProduct: (product: Product) => void;
-  updateProduct: (product: Product) => void;
-  deleteProduct: (id: string) => void;
-  addFair: (fair: Fair) => void;
-  updateFair: (fair: Fair) => void;
-  deleteFair: (id: string) => void;
-  addHistoryEvent: (event: HistoryEvent) => void;
-  updateHistoryEvent: (event: HistoryEvent) => void;
-  deleteHistoryEvent: (id: string) => void;
-  addBlogPost: (post: BlogPost) => void;
-  updateBlogPost: (post: BlogPost) => void;
-  deleteBlogPost: (id: string) => void;
-  addCategory: (category: string) => void;
-  deleteCategory: (category: string) => void;
+  addProduct: (product: Product) => Promise<boolean>;
+  updateProduct: (product: Product) => Promise<boolean>;
+  deleteProduct: (id: string) => Promise<boolean>;
+  addFair: (fair: Fair) => Promise<boolean>;
+  updateFair: (fair: Fair) => Promise<boolean>;
+  deleteFair: (id: string) => Promise<boolean>;
+  addHistoryEvent: (event: HistoryEvent) => Promise<boolean>;
+  updateHistoryEvent: (event: HistoryEvent) => Promise<boolean>;
+  deleteHistoryEvent: (id: string) => Promise<boolean>;
+  addBlogPost: (post: BlogPost) => Promise<boolean>;
+  updateBlogPost: (post: BlogPost) => Promise<boolean>;
+  deleteBlogPost: (id: string) => Promise<boolean>;
+  addCategory: (category: string) => Promise<boolean>;
+  deleteCategory: (category: string) => Promise<boolean>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -192,6 +243,9 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currency, setCurrency] = useState<Currency>('UYU');
   const [exchangeRate, setExchangeRate] = useState<number>(42); // fallback ~42 UYU/USD
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [authReady, setAuthReady] = useState<boolean>(false);
+  const { showToast } = useToast();
 
   const convertPrice = (priceUYU: number): number => {
     if (currency === 'UYU') return priceUYU;
@@ -212,17 +266,35 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       setHistory(hist);
       setBlogPosts(blogs);
       setCategories(cats);
+      setLoading(false);
     };
     loadData();
-    // Fetch exchange rate USD/UYU
+    // Cotización USD/UYU del día (si falla, queda el valor por defecto)
     fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json')
       .then(r => r.json())
-      .then(data => { if (data?.usd?.uyu) setExchangeRate(data.usd.uyu); })
-      .catch(() => {}); // Keep fallback
+      .then(data => {
+        const rate = data?.usd?.uyu;
+        if (typeof rate === 'number' && rate > 10 && rate < 200) setExchangeRate(rate);
+      })
+      .catch(() => {});
     try {
       const savedCart = localStorage.getItem('mariella_cart');
-      if (savedCart) setCart(JSON.parse(savedCart));
-    } catch { /* corrupted cart data, start fresh */ }
+      if (savedCart) {
+        const parsed = JSON.parse(savedCart);
+        if (Array.isArray(parsed) && parsed.every(i => i && typeof i.id === 'string' && typeof i.quantity === 'number')) {
+          setCart(parsed);
+        }
+      }
+    } catch { /* carrito corrupto: se arranca vacío */ }
+  }, []);
+
+  // Sesión de admin (persiste entre visitas y pestañas)
+  useEffect(() => {
+    const unsubscribe = AuthService.onAdminChange((admin) => {
+      setIsAdmin(admin);
+      setAuthReady(true);
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => { localStorage.setItem('mariella_cart', JSON.stringify(cart)); }, [cart]);
@@ -233,6 +305,7 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       if (existing) return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       return [...prev, { ...product, quantity: 1 }];
     });
+    showToast('Agregado al carrito 🛍️');
   };
 
   const removeFromCart = (id: string) => setCart(prev => prev.filter(item => item.id !== id));
@@ -240,43 +313,110 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     setCart(prev => prev.map(item => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item));
   };
   const clearCart = () => setCart([]);
-  const login = (password: string) => {
-    const adminPass = import.meta.env.VITE_ADMIN_PASSWORD;
-    if (password === adminPass) { setIsAdmin(true); return true; }
-    return false;
-  };
-  const logout = () => setIsAdmin(false);
 
-  const addProduct = async (p: Product) => { setProducts(prev => [...prev, p]); await StorageService.saveProduct(p); };
-  const updateProduct = async (p: Product) => { setProducts(prev => prev.map(x => x.id === p.id ? p : x)); await StorageService.saveProduct(p); };
-  const deleteProduct = async (id: string) => { setProducts(prev => prev.filter(x => x.id !== id)); await StorageService.deleteProduct(id); };
-
-  const addFair = async (f: Fair) => { setFairs(prev => [...prev, f]); await StorageService.saveFair(f); };
-  const updateFair = async (f: Fair) => { setFairs(prev => prev.map(x => x.id === f.id ? f : x)); await StorageService.saveFair(f); };
-  const deleteFair = async (id: string) => { setFairs(prev => prev.filter(x => x.id !== id)); await StorageService.deleteFair(id); };
-
-  const addHistoryEvent = async (h: HistoryEvent) => { setHistory(prev => [...prev, h]); await StorageService.saveHistoryEvent(h); };
-  const updateHistoryEvent = async (h: HistoryEvent) => { setHistory(prev => prev.map(x => x.id === h.id ? h : x)); await StorageService.saveHistoryEvent(h); };
-  const deleteHistoryEvent = async (id: string) => { setHistory(prev => prev.filter(x => x.id !== id)); await StorageService.deleteHistoryEvent(id); };
-
-  const addBlogPost = async (b: BlogPost) => { setBlogPosts(prev => [...prev, b]); await StorageService.saveBlogPost(b); };
-  const updateBlogPost = async (b: BlogPost) => { setBlogPosts(prev => prev.map(x => x.id === b.id ? b : x)); await StorageService.saveBlogPost(b); };
-  const deleteBlogPost = async (id: string) => { setBlogPosts(prev => prev.filter(x => x.id !== id)); await StorageService.deleteBlogPost(id); };
-
-  const addCategory = async (c: string) => {
-    if (!categories.includes(c)) {
-      setCategories(prev => [...prev, c]);
-      await StorageService.addCategory(c);
+  const login = async (password: string): Promise<boolean> => {
+    try {
+      await AuthService.signIn(password);
+      return true;
+    } catch {
+      return false;
     }
   };
-  const deleteCategory = async (c: string) => {
-    setCategories(prev => prev.filter(cat => cat !== c));
-    await StorageService.deleteCategory(c);
+  const logout = () => { AuthService.signOut(); };
+
+  // Guardado con reversa: si la nube falla, se restaura lo anterior y se avisa.
+  const persist = async (action: () => Promise<void>, revert: () => void, successMsg?: string): Promise<boolean> => {
+    try {
+      await action();
+      if (successMsg) showToast(successMsg);
+      return true;
+    } catch (e) {
+      console.error(e);
+      revert();
+      showToast('No se pudo guardar. Revisá tu conexión e intentá de nuevo.', 'error');
+      return false;
+    }
+  };
+
+  const addProduct = (p: Product) => {
+    const prev = products;
+    setProducts([...prev, p]);
+    return persist(() => StorageService.saveProduct(p), () => setProducts(prev), 'Producto guardado ✓');
+  };
+  const updateProduct = (p: Product) => {
+    const prev = products;
+    setProducts(prev.map(x => x.id === p.id ? p : x));
+    return persist(() => StorageService.saveProduct(p), () => setProducts(prev), 'Cambios guardados ✓');
+  };
+  const deleteProduct = (id: string) => {
+    const prev = products;
+    setProducts(prev.filter(x => x.id !== id));
+    return persist(() => StorageService.deleteProduct(id), () => setProducts(prev), 'Producto eliminado');
+  };
+
+  const addFair = (f: Fair) => {
+    const prev = fairs;
+    setFairs([...prev, f]);
+    return persist(() => StorageService.saveFair(f), () => setFairs(prev), 'Feria guardada ✓');
+  };
+  const updateFair = (f: Fair) => {
+    const prev = fairs;
+    setFairs(prev.map(x => x.id === f.id ? f : x));
+    return persist(() => StorageService.saveFair(f), () => setFairs(prev), 'Cambios guardados ✓');
+  };
+  const deleteFair = (id: string) => {
+    const prev = fairs;
+    setFairs(prev.filter(x => x.id !== id));
+    return persist(() => StorageService.deleteFair(id), () => setFairs(prev), 'Feria eliminada');
+  };
+
+  const addHistoryEvent = (h: HistoryEvent) => {
+    const prev = history;
+    setHistory([...prev, h]);
+    return persist(() => StorageService.saveHistoryEvent(h), () => setHistory(prev), 'Hito guardado ✓');
+  };
+  const updateHistoryEvent = (h: HistoryEvent) => {
+    const prev = history;
+    setHistory(prev.map(x => x.id === h.id ? h : x));
+    return persist(() => StorageService.saveHistoryEvent(h), () => setHistory(prev), 'Cambios guardados ✓');
+  };
+  const deleteHistoryEvent = (id: string) => {
+    const prev = history;
+    setHistory(prev.filter(x => x.id !== id));
+    return persist(() => StorageService.deleteHistoryEvent(id), () => setHistory(prev), 'Hito eliminado');
+  };
+
+  const addBlogPost = (b: BlogPost) => {
+    const prev = blogPosts;
+    setBlogPosts([...prev, b]);
+    return persist(() => StorageService.saveBlogPost(b), () => setBlogPosts(prev), 'Post guardado ✓');
+  };
+  const updateBlogPost = (b: BlogPost) => {
+    const prev = blogPosts;
+    setBlogPosts(prev.map(x => x.id === b.id ? b : x));
+    return persist(() => StorageService.saveBlogPost(b), () => setBlogPosts(prev), 'Cambios guardados ✓');
+  };
+  const deleteBlogPost = (id: string) => {
+    const prev = blogPosts;
+    setBlogPosts(prev.filter(x => x.id !== id));
+    return persist(() => StorageService.deleteBlogPost(id), () => setBlogPosts(prev), 'Post eliminado');
+  };
+
+  const addCategory = (c: string) => {
+    if (categories.includes(c)) return Promise.resolve(false);
+    const prev = categories;
+    setCategories([...prev, c]);
+    return persist(() => StorageService.addCategory(c), () => setCategories(prev), 'Categoría agregada ✓');
+  };
+  const deleteCategory = (c: string) => {
+    const prev = categories;
+    setCategories(prev.filter(cat => cat !== c));
+    return persist(() => StorageService.deleteCategory(c), () => setCategories(prev), 'Categoría eliminada');
   };
 
   return (
     <StoreContext.Provider value={{
-      products, cart, fairs, history, blogPosts, categories, currency, exchangeRate, convertPrice, isAdmin,
+      products, cart, fairs, history, blogPosts, categories, currency, exchangeRate, loading, authReady, convertPrice, isAdmin,
       setCurrency, addToCart, removeFromCart, updateCartQuantity, clearCart, login, logout,
       addProduct, updateProduct, deleteProduct, addFair, updateFair, deleteFair,
       addHistoryEvent, updateHistoryEvent, deleteHistoryEvent, addBlogPost, updateBlogPost, deleteBlogPost,
@@ -286,6 +426,47 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     </StoreContext.Provider>
   );
 };
+
+// --- Toggle de moneda reutilizable ---
+const CurrencyToggle = () => {
+  const { currency, setCurrency } = useStore();
+  return (
+    <div className="inline-flex items-center gap-1 bg-leather-50 rounded-lg p-1 border border-leather-100">
+      {(['UYU', 'USD'] as Currency[]).map(c => (
+        <button
+          key={c}
+          onClick={() => setCurrency(c)}
+          aria-pressed={currency === c}
+          className={`px-3 py-1 rounded-md text-sm font-bold transition-all ${currency === c ? 'bg-leather-900 text-white shadow-sm' : 'text-leather-600 hover:text-leather-900'}`}
+        >
+          {c === 'UYU' ? '$U' : 'US$'}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// --- Skeletons de carga ---
+const ProductCardSkeleton = ({ tall = false }: { tall?: boolean }) => (
+  <div className="bg-white rounded-xl overflow-hidden border border-leather-100 shadow-sm">
+    <div className={`${tall ? 'aspect-[4/5]' : 'aspect-square'} skeleton`} />
+    <div className="p-4 space-y-3">
+      <div className="h-5 w-3/4 skeleton rounded" />
+      <div className="h-4 w-1/3 skeleton rounded" />
+    </div>
+  </div>
+);
+
+const BlogCardSkeleton = () => (
+  <div className="bg-white rounded-xl overflow-hidden border border-leather-100 shadow-sm">
+    <div className="aspect-[16/10] skeleton" />
+    <div className="p-8 space-y-3">
+      <div className="h-3 w-1/3 skeleton rounded" />
+      <div className="h-6 w-full skeleton rounded" />
+      <div className="h-4 w-5/6 skeleton rounded" />
+    </div>
+  </div>
+);
 
 // --- Navbar & UI Components ---
 
@@ -299,9 +480,9 @@ const TopBar = () => (
 );
 
 const FloatingWhatsApp = () => (
-  <a 
-    href="https://wa.me/59898766318" 
-    target="_blank" 
+  <a
+    href={waLink('¡Hola MARIEL\'LA! Quiero hacerles una consulta 😊')}
+    target="_blank"
     rel="noopener noreferrer"
     className="fixed bottom-6 right-6 z-40 bg-[#25D366] text-white p-4 rounded-full shadow-2xl hover:bg-[#20bd5a] transition-all duration-300 hover:scale-110 flex items-center justify-center group"
     aria-label="Contactar por WhatsApp"
@@ -323,11 +504,20 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 30);
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Determine if we need light text (on dark Hero background and not scrolled)
+  // Bloquear el scroll del fondo cuando el menú móvil está abierto
+  useEffect(() => {
+    document.body.style.overflow = isMenuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isMenuOpen]);
+
+  // Cerrar el menú al cambiar de página
+  useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);
+
+  // Texto claro sobre el hero oscuro de la portada (sin scroll)
   const isHomeHero = location.pathname === '/' && !scrolled;
   const textColorClass = isHomeHero ? 'text-leather-100 hover:text-white' : 'text-leather-900 hover:text-leather-600';
   const iconColorClass = isHomeHero ? 'text-leather-100 hover:text-white' : 'text-leather-800 hover:text-leather-500';
@@ -352,22 +542,31 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
   const NavLink = ({ label, to, isAnchor = false }: { label: string, to: string, isAnchor?: boolean }) => {
     const isActive = !isAnchor && location.pathname === to;
     return (
-      <Link 
-        to={to} 
+      <Link
+        to={to}
         onClick={(e) => handleNavClick(e, to, isAnchor)}
         className={`font-serif font-medium tracking-wide transition-all duration-300 relative group ${textColorClass}`}
       >
         {label}
-        <span className={`absolute -bottom-1 left-0 w-0 h-0.5 bg-leather-600 transition-all duration-300 group-hover:w-full ${isActive ? 'w-full' : ''}`}></span>
+        <span className={`absolute -bottom-1 left-0 h-0.5 bg-leather-600 transition-all duration-300 group-hover:w-full ${isActive ? 'w-full' : 'w-0'}`}></span>
       </Link>
     );
   };
+
+  const mobileLinks = [
+    { label: 'Inicio', to: '/' },
+    { label: 'Tienda', to: '/catalogo' },
+    { label: 'Mariela', to: '/nosotros' },
+    { label: 'Historia', to: '/historia' },
+    { label: 'Descubre', to: '/blog' },
+    { label: 'Ferias', to: '/ferias' },
+  ];
 
   return (
     <>
     <ScrollToTop />
     <TopBar />
-    <nav className={`fixed top-8 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-leather-50/95 backdrop-blur-md shadow-md py-2 top-0' : 'bg-transparent py-6'}`}>
+    <nav className={`fixed w-full z-50 transition-all duration-300 ${scrolled ? 'top-0 bg-leather-50/95 backdrop-blur-md shadow-md py-2' : 'top-0 sm:top-8 bg-transparent py-6'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
           <Link to="/" onClick={(e) => handleNavClick(e, '/', false)} className={`font-serif text-2xl tracking-wider font-bold z-50 cursor-pointer ${logoColorClass}`}>
@@ -382,31 +581,33 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
             <NavLink label="Contacto" to="#contacto" isAnchor={true} />
           </div>
           <div className="flex items-center space-x-4 z-50">
-            <button onClick={toggleCart} className={`relative p-2 transition-colors rounded-full hover:bg-white/20 ${iconColorClass}`}>
+            <button onClick={toggleCart} className={`relative p-2 transition-colors rounded-full hover:bg-white/20 ${iconColorClass}`} aria-label={`Abrir carrito (${itemCount} ${itemCount === 1 ? 'artículo' : 'artículos'})`}>
               <ShoppingBag size={22} />
               {itemCount > 0 && (
-                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 text-xs font-bold leading-none text-white bg-leather-600 rounded-full shadow-sm">
+                <span key={itemCount} className="animate-cart-bounce absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 text-xs font-bold leading-none text-white bg-leather-600 rounded-full shadow-sm">
                   {itemCount}
                 </span>
               )}
             </button>
-            <Link to={isAdmin ? "/admin" : "/login"} className={`p-2 rounded-full hover:bg-white/20 transition-colors ${iconColorClass}`} aria-label="Configuración">
+            <Link to={isAdmin ? "/admin" : "/login"} className={`p-2 rounded-full hover:bg-white/20 transition-colors ${iconColorClass}`} aria-label="Panel de administración">
               <Settings size={20} />
             </Link>
-            <button className={`md:hidden p-2 rounded-full ${iconColorClass}`} onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}>
+            <button className={`md:hidden p-2 rounded-full ${iconColorClass}`} onClick={() => setIsMenuOpen(!isMenuOpen)} aria-expanded={isMenuOpen} aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}>
               {isMenuOpen ? <X /> : <Menu />}
             </button>
           </div>
         </div>
       </div>
       {isMenuOpen && (
-        <div className="md:hidden absolute top-0 left-0 w-full h-screen bg-leather-50 flex flex-col items-center justify-center space-y-8 z-40">
-            <Link to="/" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Inicio</Link>
-            <Link to="/catalogo" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Tienda</Link>
-            <Link to="/nosotros" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Mariela</Link>
-            <Link to="/blog" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Descubre</Link>
-            <Link to="/ferias" onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl">Ferias</Link>
-            <a href="#contacto" onClick={(e) => handleNavClick(e, '#contacto', true)} className="text-leather-900 font-bold text-xl">Contacto</a>
+        <div className="md:hidden fixed inset-0 h-screen bg-leather-50 flex flex-col items-center justify-center space-y-7 z-40 animate-fade-in-up">
+            {mobileLinks.map(l => (
+              <Link key={l.to} to={l.to} onClick={() => setIsMenuOpen(false)} className="text-leather-900 font-bold text-xl font-serif">{l.label}</Link>
+            ))}
+            <a href="#contacto" onClick={(e) => handleNavClick(e, '#contacto', true)} className="text-leather-900 font-bold text-xl font-serif">Contacto</a>
+            <div className="flex gap-4 pt-4">
+              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="w-11 h-11 rounded-full bg-leather-900 flex items-center justify-center"><Instagram size={20} className="text-leather-100" /></a>
+              <a href={waLink()} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" className="w-11 h-11 rounded-full bg-[#25D366] flex items-center justify-center"><MessageCircle size={20} className="text-white fill-white" /></a>
+            </div>
         </div>
       )}
     </nav>
@@ -419,7 +620,7 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
 const HeroSection = () => (
   <section id="inicio" className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden bg-leather-900">
     <div className="absolute inset-0 z-0">
-      <img src={processImageUrl("https://drive.google.com/file/d/1qeN28si1WAj_TmotiGxcENBATPK1Ugze/view?usp=drive_link", 1920)} alt="Textura cuero" className="absolute inset-0 w-full h-full object-cover blur-[2px]" onError={handleImgError} />
+      <img src="/fotos/hero-cuero.jpg" alt="Textura cuero" fetchPriority="high" className="absolute inset-0 w-full h-full object-cover blur-[2px]" onError={handleImgError} />
       <div className="absolute inset-0 bg-leather-900/40 z-10" />
       <div className="absolute inset-0 bg-gradient-to-t from-leather-900/80 to-transparent z-10" />
       <div className="absolute inset-0 z-20 opacity-10 mix-blend-overlay" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)'}} />
@@ -444,8 +645,48 @@ const HeroSection = () => (
   </section>
 );
 
+// --- Cómo Comprar (nuevo) ---
+const HowToBuySection = () => {
+  const steps = [
+    { icon: <Search size={26} />, title: '1. Elegí tu pieza', desc: 'Recorré la tienda online o vení a vernos a una feria. Cada pieza es única: la que te enamora, es tuya.' },
+    { icon: <MessageCircle size={26} />, title: '2. Escribinos por WhatsApp', desc: 'El pedido se confirma por WhatsApp. Coordinamos pago (transferencia, giro o efectivo) directo con Mariela.' },
+    { icon: <Truck size={26} />, title: '3. Recibila donde estés', desc: 'Hacemos envíos por agencia a todo Uruguay. También podés retirarla en Piriápolis o en la próxima feria.' },
+  ];
+  return (
+    <section id="como-comprar" className="py-24 bg-leather-900 relative overflow-hidden scroll-mt-20">
+      <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-[size:14px_14px] pointer-events-none"></div>
+      <div className="max-w-6xl mx-auto px-4 relative z-10">
+        <Reveal>
+          <div className="text-center mb-16">
+            <span className="text-leather-300 uppercase tracking-widest text-xs font-bold">Simple y directo</span>
+            <h2 className="text-4xl font-serif font-bold text-leather-50 mt-2">¿Cómo comprar?</h2>
+          </div>
+        </Reveal>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {steps.map((step, i) => (
+            <Reveal key={i} delay={i * 150}>
+              <div className="bg-leather-800/60 border border-leather-700 rounded-2xl p-8 text-center h-full backdrop-blur-sm hover:bg-leather-800 transition-colors">
+                <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-leather-100 text-leather-900 flex items-center justify-center shadow-lg">{step.icon}</div>
+                <h3 className="text-xl font-serif font-bold text-leather-50 mb-3">{step.title}</h3>
+                <p className="text-leather-200 text-sm leading-relaxed font-medium">{step.desc}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+        <Reveal delay={300}>
+          <div className="text-center mt-12">
+            <a href={waLink('¡Hola MARIEL\'LA! Quiero hacer una consulta sobre una pieza 😊')} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-[#25D366] text-white px-8 py-3 rounded-full font-bold hover:bg-[#20bd5a] transition-all shadow-lg hover:scale-105">
+              <MessageCircle size={20} className="fill-white" /> Escribinos ahora
+            </a>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+};
+
 const DiscoverSection = () => {
-  const { blogPosts } = useStore();
+  const { blogPosts, loading } = useStore();
   const featuredPosts = blogPosts.slice(0, 3);
 
   return (
@@ -457,13 +698,17 @@ const DiscoverSection = () => {
             <h2 className="text-4xl font-serif font-bold text-leather-900 mt-2">Descubre el Mundo del Cuero</h2>
           </div>
         </Reveal>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {featuredPosts.map((post, i) => (
+          {loading ? (
+            <>
+              <BlogCardSkeleton /><BlogCardSkeleton /><BlogCardSkeleton />
+            </>
+          ) : featuredPosts.map((post, i) => (
             <Reveal key={post.id} delay={i * 100}>
               <Link to={`/blog/${post.id}`} className="group block bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all h-full border border-leather-100">
                 <div className="aspect-[16/10] overflow-hidden">
-                  <img src={processImageUrl(post.imageUrl, 600)} alt={post.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
+                  <img src={imgSrc1(post.imageUrl, 600)} alt={post.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" onError={handleImgError} />
                 </div>
                 <div className="p-8">
                   <div className="flex items-center gap-2 text-xs text-leather-500 mb-3 font-bold uppercase tracking-wider">
@@ -483,10 +728,7 @@ const DiscoverSection = () => {
 };
 
 // --- About Mariela Section ---
-const AboutMariela = () => {
-  useEffect(() => { document.title = "Conoce a Mariela - MARIEL'LA"; }, []);
-
-  return (
+const AboutMariela = () => (
     <section className="py-24 bg-white border-t border-leather-100 scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4">
         <Reveal>
@@ -501,20 +743,15 @@ const AboutMariela = () => {
           {/* Left: Photo Collage */}
           <Reveal>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="aspect-[3/4] rounded-2xl overflow-hidden shadow-lg border border-leather-100">
-                  <img src={processImageUrl("https://drive.google.com/file/d/1nMQHF1eWwDKQsQL-Fggx1lbex5V0nZ3b/view?usp=drive_link", 600)} alt="Mariela Calistro" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
-                </div>
-                <div className="aspect-[3/4] rounded-2xl overflow-hidden shadow-lg border border-leather-100">
-                  <img src="/fotos/familia/pablo-calistro-con-hijas.jpg" alt="Pablo Calistro con sus hijas" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" onError={handleImgError} />
-                </div>
+              <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-lg border border-leather-100">
+                <img src="/fotos/familia/pablo-calistro-con-hijas.jpg" alt="Pablo Calistro con sus hijas" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" loading="lazy" onError={handleImgError} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-lg border border-leather-100">
-                  <img src="/fotos/familia/pablo-y-esposa-retrato.jpg" alt="Pablo y Maris Ferreira" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" onError={handleImgError} />
+                  <img src="/fotos/familia/pablo-y-esposa-retrato.jpg" alt="Pablo Calistro y Maris Ferreira" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" loading="lazy" onError={handleImgError} />
                 </div>
                 <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-lg border border-leather-100">
-                  <img src="/fotos/familia/familia-grupo-jardin.jpg" alt="Familia Calistro" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" onError={handleImgError} />
+                  <img src="/fotos/familia/familia-grupo-jardin.jpg" alt="Familia Calistro Ferreira" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" loading="lazy" onError={handleImgError} />
                 </div>
               </div>
               <p className="text-center text-xs text-leather-400 italic mt-2">La familia Calistro Ferreira: tradición artesanal de generaciones</p>
@@ -543,6 +780,10 @@ const AboutMariela = () => {
                 <p className="text-leather-800 font-serif italic text-lg leading-relaxed">"Me encanta crear, diseñar, inventar. Cada pieza que hago lleva un pedazo de mi historia y la de mi familia."</p>
                 <p className="text-leather-600 font-bold mt-3 text-sm">— Mariela Calistro</p>
               </div>
+
+              <Link to="/historia" className="inline-flex items-center gap-2 mt-8 text-leather-800 font-bold hover:text-leather-600 transition-colors self-start border-b-2 border-leather-200 hover:border-leather-600 pb-0.5">
+                Conocé nuestra trayectoria completa <ArrowRight size={16} />
+              </Link>
             </div>
           </Reveal>
         </div>
@@ -566,12 +807,11 @@ const AboutMariela = () => {
         </Reveal>
       </div>
     </section>
-  );
-};
+);
 
 // --- About Page Wrapper ---
 const AboutPage = () => {
-  useEffect(() => { window.scrollTo(0, 0); }, []);
+  usePageMeta("Conoce a Mariela - MARIEL'LA", 'La historia de Mariela Calistro: una vida entre telas, cuero y creatividad. Artesanía uruguaya con herencia familiar.');
   return (
     <div className="pt-24 animate-fade-in-up">
       <AboutMariela />
@@ -579,15 +819,48 @@ const AboutPage = () => {
   );
 };
 
+// --- Instagram CTA (nuevo) ---
+const InstagramCTA = () => (
+  <section className="py-16 bg-white border-t border-leather-100">
+    <div className="max-w-4xl mx-auto px-4">
+      <Reveal>
+        <a
+          href={INSTAGRAM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group block rounded-2xl p-[3px] bg-gradient-to-tr from-yellow-500 via-red-500 to-purple-500 shadow-lg hover:shadow-2xl transition-all hover:scale-[1.01]"
+        >
+          <div className="bg-white rounded-2xl px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-yellow-500 via-red-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                <Instagram size={32} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-serif font-bold text-leather-900">Seguinos en Instagram</h3>
+                <p className="text-leather-600 font-medium">Nuevas piezas, ferias y el detrás de escena del taller</p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-2 bg-leather-900 text-white px-6 py-3 rounded-full font-bold group-hover:bg-leather-800 transition whitespace-nowrap">
+              @mariellacalistro <ArrowRight size={16} />
+            </span>
+          </div>
+        </a>
+      </Reveal>
+    </div>
+  </section>
+);
+
 const HomePage = () => {
-  useEffect(() => { document.title = "MARIEL'LA | Artesanía en Cuero"; }, []);
+  usePageMeta("MARIEL'LA | Artesanía en Cuero Uruguaya", 'Artesanía en cuero genuino hecha a mano en Uruguay. Carteras, bolsos, billeteras y accesorios únicos con identidad uruguaya. Envíos a todo el país.');
   return (
-    <div className="animate-fade-in-up scroll-smooth">
+    <div className="animate-fade-in-up">
       <HeroSection />
       <Reveal><FeaturedCarousel /></Reveal>
+      <HowToBuySection />
       <AboutMariela />
       <DiscoverSection />
       <Reveal><FairsTeaser /></Reveal>
+      <InstagramCTA />
       <Reveal><ContactSection /></Reveal>
     </div>
   );
@@ -596,12 +869,18 @@ const HomePage = () => {
 // --- Sections Components ---
 
 const FeaturedCarousel = () => {
-  const { products, currency, convertPrice } = useStore();
-  const displayProducts = products.filter(p => p.isFeatured).concat(products.filter(p => !p.isFeatured)).slice(0, 6);
+  const { products, currency, convertPrice, loading } = useStore();
+  const available = products.filter(p => !p.isSoldOut);
+  const displayProducts = available.filter(p => p.isFeatured).concat(available.filter(p => !p.isFeatured)).slice(0, 6);
   const [startIndex, setStartIndex] = useState(0);
 
-  const nextSlide = () => setStartIndex(prev => (prev + 1) % (displayProducts.length - 2)); 
-  const prevSlide = () => setStartIndex(prev => (prev - 1 + (displayProducts.length - 2)) % (displayProducts.length - 2));
+  const maxStart = Math.max(0, displayProducts.length - 3);
+  useEffect(() => {
+    if (startIndex > maxStart) setStartIndex(0);
+  }, [maxStart, startIndex]);
+
+  const nextSlide = () => setStartIndex(prev => (prev + 1) % (maxStart + 1));
+  const prevSlide = () => setStartIndex(prev => (prev - 1 + maxStart + 1) % (maxStart + 1));
   const visibleProducts = displayProducts.slice(startIndex, startIndex + 3);
 
   return (
@@ -612,25 +891,38 @@ const FeaturedCarousel = () => {
            <span className="text-leather-600 uppercase tracking-widest text-xs font-bold">Hecho a Mano</span>
            <h2 className="text-4xl font-serif font-bold text-leather-900 mt-2">Colección de Temporada</h2>
         </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <ProductCardSkeleton tall /><div className="hidden md:block"><ProductCardSkeleton tall /></div><div className="hidden md:block"><ProductCardSkeleton tall /></div>
+          </div>
+        ) : displayProducts.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-leather-200">
+            <Sparkles size={40} className="mx-auto text-leather-300 mb-4" />
+            <p className="text-leather-600 font-medium text-lg mb-2">Estamos preparando nuevas piezas</p>
+            <p className="text-leather-400 text-sm">Seguinos en Instagram para enterarte primero</p>
+          </div>
+        ) : (
+        <>
         <div className="hidden md:block relative">
            <div className="flex gap-8 justify-center">
              {visibleProducts.map((product) => (
                 <div key={product.id} className="w-1/3 group relative">
                   <Link to={`/producto/${product.id}`} className="block">
                     <div className="aspect-[4/5] overflow-hidden rounded-lg mb-4 relative shadow-md">
-                       <img src={processImageUrl(product.images[0], 600)} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" onError={handleImgError} />
+                       <img src={imgSrc(product.images, 600)} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" onError={handleImgError} />
                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-leather-900/80 backdrop-blur-sm text-white text-sm px-4 py-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none font-bold shadow-xl text-center min-w-[140px]">{product.name}</div>
                     </div>
                     <h3 className="text-xl font-serif font-bold text-leather-900">{product.name}</h3>
-                    <p className="text-leather-600 font-bold text-lg">{currency} {convertPrice(product.priceUYU).toLocaleString()}</p>
+                    <p className="text-leather-600 font-bold text-lg">{formatPrice(convertPrice(product.priceUYU), currency)}</p>
                   </Link>
                 </div>
              ))}
            </div>
            {displayProducts.length > 3 && (
              <>
-               <button onClick={prevSlide} className="absolute top-1/2 -left-4 -translate-y-1/2 bg-white text-leather-900 p-3 rounded-full shadow-lg hover:bg-leather-100 border border-leather-100 transition-all z-10"><ChevronLeft size={24} /></button>
-               <button onClick={nextSlide} className="absolute top-1/2 -right-4 -translate-y-1/2 bg-white text-leather-900 p-3 rounded-full shadow-lg hover:bg-leather-100 border border-leather-100 transition-all z-10"><ChevronRight size={24} /></button>
+               <button onClick={prevSlide} className="absolute top-1/2 -left-4 -translate-y-1/2 bg-white text-leather-900 p-3 rounded-full shadow-lg hover:bg-leather-100 border border-leather-100 transition-all z-10" aria-label="Anterior"><ChevronLeft size={24} /></button>
+               <button onClick={nextSlide} className="absolute top-1/2 -right-4 -translate-y-1/2 bg-white text-leather-900 p-3 rounded-full shadow-lg hover:bg-leather-100 border border-leather-100 transition-all z-10" aria-label="Siguiente"><ChevronRight size={24} /></button>
              </>
            )}
         </div>
@@ -639,17 +931,19 @@ const FeaturedCarousel = () => {
               <div key={product.id} className="group">
                   <Link to={`/producto/${product.id}`} className="block">
                     <div className="aspect-square overflow-hidden rounded-lg mb-4 relative shadow-md">
-                       <img src={processImageUrl(product.images[0], 600)} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                       <img src={imgSrc(product.images, 600)} alt={product.name} className="w-full h-full object-cover" loading="lazy" onError={handleImgError} />
                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4 pt-12"><span className="text-white font-bold text-sm">{product.name}</span></div>
                     </div>
                     <div className="flex justify-between items-center mt-2">
                        <h3 className="text-xl font-serif font-bold text-leather-900">{product.name}</h3>
-                       <p className="text-leather-600 font-bold">{currency} {convertPrice(product.priceUYU).toLocaleString()}</p>
+                       <p className="text-leather-600 font-bold">{formatPrice(convertPrice(product.priceUYU), currency)}</p>
                     </div>
                   </Link>
               </div>
            ))}
         </div>
+        </>
+        )}
         <div className="text-center mt-12">
           <Link to="/catalogo" className="bg-leather-900 text-white px-8 py-3 rounded-lg font-bold hover:bg-leather-800 transition shadow-lg">Ver Todo el Catálogo</Link>
         </div>
@@ -660,7 +954,7 @@ const FeaturedCarousel = () => {
 
 const FairsTeaser = () => {
   const { fairs } = useStore();
-  const upcoming = fairs.filter(f => f.status === 'upcoming').sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 2);
+  const upcoming = fairs.filter(f => f.status === 'upcoming').sort((a,b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime()).slice(0, 2);
 
   return (
     <section id="ferias" className="py-24 bg-leather-50 border-t border-leather-200 scroll-mt-20 relative">
@@ -673,8 +967,8 @@ const FairsTeaser = () => {
             {upcoming.map(fair => (
               <div key={fair.id} className="bg-white rounded-xl p-8 border border-leather-100 flex flex-col items-start hover:shadow-lg transition-shadow">
                 <div className="bg-leather-50 px-4 py-2 rounded-lg border border-leather-200 mb-4 text-center">
-                   <span className="block text-2xl font-bold text-leather-900 leading-none">{new Date(fair.date).getDate()}</span>
-                   <span className="block text-xs font-bold text-leather-500 uppercase">{new Date(fair.date).toLocaleString('es-ES', { month: 'short' })}</span>
+                   <span className="block text-2xl font-bold text-leather-900 leading-none">{parseLocalDate(fair.date).getDate()}</span>
+                   <span className="block text-xs font-bold text-leather-500 uppercase">{parseLocalDate(fair.date).toLocaleString('es-UY', { month: 'short' })}</span>
                 </div>
                 <h3 className="text-2xl font-bold text-leather-900 mb-2">{fair.name}</h3>
                 <p className="text-leather-600 mb-4 flex items-center gap-2 font-medium"><MapPin size={18} /> {fair.city}</p>
@@ -701,15 +995,18 @@ const ContactSection = () => (
             <h2 className="text-3xl font-serif font-bold mb-6">Hablemos</h2>
             <p className="text-leather-200 mb-8 leading-relaxed font-medium">¿Tenés una idea especial? ¿Querés personalizar un producto? Estamos aquí para responder todas tus dudas.</p>
             <div className="space-y-6">
-              <a href="https://wa.me/59898766318" className="flex items-center gap-4 group cursor-pointer hover:bg-leather-800 p-2 -ml-2 rounded-lg transition-colors">
-                 <div className="bg-[#25D366] p-1 rounded-full"><MessageCircle size={18} className="text-white fill-white" /></div> 
+              <a href={waLink('¡Hola MARIEL\'LA! Quiero hacerles una consulta 😊')} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 group cursor-pointer hover:bg-leather-800 p-2 -ml-2 rounded-lg transition-colors">
+                 <div className="bg-[#25D366] p-1 rounded-full"><MessageCircle size={18} className="text-white fill-white" /></div>
                  <span className="font-bold text-lg text-white">+598 98 766 318</span>
               </a>
-              {/* Email Removed */}
-              <a href="https://www.instagram.com/mariellacalistro/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 group cursor-pointer hover:bg-leather-800 p-2 -ml-2 rounded-lg transition-colors">
+              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 group cursor-pointer hover:bg-leather-800 p-2 -ml-2 rounded-lg transition-colors">
                  <div className="bg-gradient-to-tr from-yellow-500 via-red-500 to-purple-500 p-1 rounded-full"><Instagram size={18} className="text-white" /></div>
                  <span className="font-bold text-lg text-white">@mariellacalistro</span>
               </a>
+              <div className="flex items-center gap-4 p-2 -ml-2">
+                 <div className="bg-leather-700 p-1 rounded-full"><MapPin size={18} className="text-white" /></div>
+                 <span className="font-medium text-leather-200">Piriápolis, Maldonado — Uruguay</span>
+              </div>
             </div>
           </div>
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:8px_8px]"></div>
@@ -718,7 +1015,7 @@ const ContactSection = () => (
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:16px_16px]"></div>
           {/* Circular Image Container for the Artisan */}
           <div className="relative w-64 h-64 rounded-full border-[6px] border-white shadow-2xl overflow-hidden z-10 ring-4 ring-leather-200/50">
-             <img src={processImageUrl("https://drive.google.com/file/d/1nMQHF1eWwDKQsQL-Fggx1lbex5V0nZ3b/view?usp=drive_link", 600)} alt="Mariela Calistro" className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700" />
+             <img src="/fotos/familia/familia-celebracion-fiesta.jpg" alt="Familia Calistro celebrando" className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700" loading="lazy" onError={handleImgError} />
           </div>
           {/* Decorative Elements */}
           <div className="absolute top-10 right-10 opacity-20"><Hammer size={120} className="text-leather-300" /></div>
@@ -729,40 +1026,74 @@ const ContactSection = () => (
 );
 
 const BlogPage = () => {
-  const { blogPosts } = useStore();
+  const { blogPosts, loading } = useStore();
   const { id: urlPostId } = useParams();
-  const [selectedPost, setSelectedPost] = useState<string | null>(urlPostId || null);
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  const post = urlPostId ? blogPosts.find(p => p.id === urlPostId) : undefined;
 
-  useEffect(() => {
-    if (urlPostId) setSelectedPost(urlPostId);
-  }, [urlPostId]);
+  usePageMeta(
+    post ? `${post.title} - MARIEL'LA` : "Blog - MARIEL'LA",
+    post ? post.excerpt : 'Historias del taller: el mundo del cuero uruguayo, consejos de cuidado y novedades de MARIEL\'LA.'
+  );
 
-  useEffect(() => {
-    window.scrollTo(0,0);
-    document.title = selectedPost
-      ? `${blogPosts.find(p=>p.id===selectedPost)?.title} - MARIEL'LA`
-      : "Blog - MARIEL'LA";
-  }, [selectedPost, blogPosts]);
+  const handleShare = async () => {
+    if (!post) return;
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: post.title, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        showToast('Link copiado 📋', 'info');
+      }
+    } catch { /* usuario canceló */ }
+  };
 
-  if (selectedPost) {
-    const post = blogPosts.find(p => p.id === selectedPost);
-    if (!post) return null;
+  if (urlPostId) {
+    if (!post) {
+      if (loading) {
+        return (
+          <div className="bg-white min-h-screen pt-32 pb-24">
+            <div className="max-w-3xl mx-auto px-6 space-y-6">
+              <div className="h-4 w-40 skeleton rounded" />
+              <div className="h-12 w-full skeleton rounded" />
+              <div className="aspect-video w-full skeleton rounded-xl" />
+              <div className="h-4 w-full skeleton rounded" />
+              <div className="h-4 w-5/6 skeleton rounded" />
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-leather-50 pt-20">
+          <div className="text-center px-4">
+            <ScrollText size={48} className="mx-auto text-leather-200 mb-4" />
+            <h2 className="text-2xl font-serif font-bold text-leather-900 mb-2">Artículo no encontrado</h2>
+            <p className="text-leather-500 mb-6">Este artículo ya no está disponible.</p>
+            <Link to="/blog" className="bg-leather-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-leather-800 transition">Ver el blog</Link>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="bg-white min-h-screen pt-32 pb-24 animate-fade-in-up">
         <div className="max-w-3xl mx-auto px-6">
-          <button onClick={() => setSelectedPost(null)} className="flex items-center text-leather-600 font-bold mb-8 hover:underline"><ChevronLeft size={20}/> Volver</button>
+          <button onClick={() => navigate('/blog')} className="flex items-center text-leather-600 font-bold mb-8 hover:underline"><ChevronLeft size={20}/> Volver</button>
           <span className="text-leather-600 font-bold uppercase text-xs tracking-wider mb-2 block">{post.date} • {post.readTime}</span>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-leather-900 mb-8 leading-tight">{post.title}</h1>
           <div className="aspect-video w-full rounded-xl overflow-hidden mb-10 shadow-lg border border-leather-200">
-            <img src={processImageUrl(post.imageUrl, 1200)} alt={post.title} className="w-full h-full object-cover" onError={handleImgError} />
+            <img src={imgSrc1(post.imageUrl, 1200)} alt={post.title} className="w-full h-full object-cover" onError={handleImgError} />
           </div>
           <div className="prose prose-lg prose-stone mx-auto text-leather-800 leading-relaxed font-serif">
              <p className="font-bold text-xl mb-6 text-leather-900">{post.excerpt}</p>
-             {post.content.split('\n').map((p, i) => <p key={i} className="mb-6">{p}</p>)}
+             {post.content.split('\n').filter(p => p.trim()).map((p, i) => <p key={i} className="mb-6">{p}</p>)}
           </div>
           <div className="mt-12 pt-8 border-t border-leather-200 flex items-center justify-between">
             <span className="font-bold text-leather-900">Escrito por {post.author}</span>
-            <div className="flex gap-2"><Heart className="text-leather-400" /></div>
+            <button onClick={handleShare} className="flex items-center gap-2 text-leather-600 hover:text-leather-900 font-bold transition-colors" aria-label="Compartir artículo">
+              <Share2 size={18} /> Compartir
+            </button>
           </div>
         </div>
       </div>
@@ -777,20 +1108,22 @@ const BlogPage = () => {
            <h1 className="text-4xl font-serif font-bold text-leather-900 mt-2">Historias del Taller</h1>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {blogPosts.map((post) => (
-             <div key={post.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all h-full border border-leather-100 flex flex-col cursor-pointer" onClick={() => setSelectedPost(post.id)}>
+          {loading ? (
+            <><BlogCardSkeleton /><BlogCardSkeleton /><BlogCardSkeleton /></>
+          ) : blogPosts.map((post) => (
+             <Link key={post.id} to={`/blog/${post.id}`} className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all h-full border border-leather-100 flex flex-col">
                 <div className="aspect-[16/10] overflow-hidden">
-                  <img src={processImageUrl(post.imageUrl, 600)} alt={post.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" loading="lazy" />
+                  <img src={imgSrc1(post.imageUrl, 600)} alt={post.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" onError={handleImgError} />
                 </div>
                 <div className="p-8 flex-1 flex flex-col">
                   <div className="flex items-center gap-2 text-xs text-leather-500 mb-3 font-bold uppercase tracking-wider">
-                    <span>{post.date}</span>
+                    <span>{post.date}</span> • <span>{post.readTime}</span>
                   </div>
-                  <h3 className="text-xl font-serif font-bold text-leather-900 mb-3 leading-tight hover:text-leather-600 transition-colors">{post.title}</h3>
+                  <h3 className="text-xl font-serif font-bold text-leather-900 mb-3 leading-tight group-hover:text-leather-600 transition-colors">{post.title}</h3>
                   <p className="text-leather-700 text-sm line-clamp-3 mb-6 leading-relaxed flex-1 font-medium">{post.excerpt}</p>
-                  <span className="inline-flex items-center text-sm font-bold text-leather-800 border-b-2 border-leather-200 hover:border-leather-600 transition-all self-start">Leer artículo <ArrowRight size={14} className="ml-1" /></span>
+                  <span className="inline-flex items-center text-sm font-bold text-leather-800 border-b-2 border-leather-200 group-hover:border-leather-600 transition-all self-start">Leer artículo <ArrowRight size={14} className="ml-1" /></span>
                 </div>
-             </div>
+             </Link>
           ))}
         </div>
       </div>
@@ -800,7 +1133,8 @@ const BlogPage = () => {
 
 const ProductDetail = () => {
   const { id } = useParams();
-  const { products, addToCart, currency, convertPrice } = useStore();
+  const { products, addToCart, currency, convertPrice, loading } = useStore();
+  const { showToast } = useToast();
   const [selectedImg, setSelectedImg] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [showMagnifier, setShowMagnifier] = useState(false);
@@ -808,31 +1142,67 @@ const ProductDetail = () => {
   const [bgPos, setBgPos] = useState({ x: 0, y: 0 });
   const imgContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { window.scrollTo(0,0) }, [id]);
-  
   const product = products.find(p => p.id === id);
-  
-  // Dynamic Title
-  useEffect(() => {
-    if (product) document.title = `${product.name} - MARIEL'LA`;
-  }, [product]);
 
-  if (!product) return (
-    <div className="min-h-screen flex items-center justify-center bg-leather-50 pt-20">
-      <div className="text-center px-4">
-        <ShoppingBag size={48} className="mx-auto text-leather-200 mb-4" />
-        <h2 className="text-2xl font-serif font-bold text-leather-900 mb-2">Producto no encontrado</h2>
-        <p className="text-leather-500 mb-6">Este producto ya no está disponible o fue removido.</p>
-        <Link to="/catalogo" className="bg-leather-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-leather-800 transition">Ver catálogo</Link>
-      </div>
-    </div>
+  usePageMeta(
+    product ? `${product.name} - MARIEL'LA` : "Producto - MARIEL'LA",
+    product ? product.description.slice(0, 155) : undefined
   );
-  const currentImageUrl = processImageUrl(product.images[selectedImg], 1200);
-  const highResImageUrl = processImageUrl(product.images[selectedImg], 2400);
+
+  // Al cambiar de producto, volver a la primera foto
+  useEffect(() => { setSelectedImg(0); }, [id]);
+
+  // Lightbox: teclado (Esc, flechas) y bloqueo de scroll
+  useEffect(() => {
+    if (!isLightboxOpen || !product) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsLightboxOpen(false);
+      if (e.key === 'ArrowRight') setSelectedImg(prev => (prev + 1) % product.images.length);
+      if (e.key === 'ArrowLeft') setSelectedImg(prev => (prev - 1 + product.images.length) % product.images.length);
+    };
+    window.addEventListener('keydown', handler);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handler);
+      document.body.style.overflow = '';
+    };
+  }, [isLightboxOpen, product]);
+
+  if (!product) {
+    if (loading) {
+      return (
+        <div className="bg-white min-h-screen pt-36 pb-12">
+          <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-16">
+            <div className="aspect-square skeleton rounded-2xl" />
+            <div className="space-y-4 py-8">
+              <div className="h-4 w-24 skeleton rounded" />
+              <div className="h-12 w-3/4 skeleton rounded" />
+              <div className="h-8 w-32 skeleton rounded" />
+              <div className="h-24 w-full skeleton rounded" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-leather-50 pt-20">
+        <div className="text-center px-4">
+          <ShoppingBag size={48} className="mx-auto text-leather-200 mb-4" />
+          <h2 className="text-2xl font-serif font-bold text-leather-900 mb-2">Producto no encontrado</h2>
+          <p className="text-leather-500 mb-6">Este producto ya no está disponible o fue removido.</p>
+          <Link to="/catalogo" className="bg-leather-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-leather-800 transition">Ver catálogo</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const currentImageUrl = imgSrc(product.images, 1200, selectedImg);
+  const highResImageUrl = imgSrc(product.images, 2400, selectedImg);
+  const hasMultipleImages = product.images.length > 1;
 
   // Related Products Logic
   const relatedProducts = products
-    .filter(p => p.category === product.category && p.id !== product.id)
+    .filter(p => p.category === product.category && p.id !== product.id && !p.isSoldOut)
     .slice(0, 3);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -844,6 +1214,21 @@ const ProductDetail = () => {
     setBgPos({ x: (x / width) * 100, y: (y / height) * 100 });
   };
 
+  const productUrl = `${window.location.origin}/producto/${product.id}`;
+  const consultUrl = waLink(`¡Hola MARIEL'LA! Me interesa esta pieza: ${product.name} — ${productUrl}`);
+  const encargoUrl = waLink(`¡Hola MARIEL'LA! Vi que "${product.name}" está agotada. ¿Podrían hacerme una pieza similar por encargue? — ${productUrl}`);
+
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: product.name, url: productUrl });
+      } else {
+        await navigator.clipboard.writeText(productUrl);
+        showToast('Link copiado 📋', 'info');
+      }
+    } catch { /* usuario canceló */ }
+  };
+
   return (
     <>
       <div className="bg-white min-h-screen pt-36 pb-12 animate-fade-in-up">
@@ -851,37 +1236,60 @@ const ProductDetail = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-24">
             <div className="space-y-6">
               <div ref={imgContainerRef} className={`relative aspect-square bg-leather-50 rounded-2xl overflow-hidden border border-leather-100 shadow-sm group ${showMagnifier ? 'cursor-none' : 'cursor-zoom-in'}`} onMouseEnter={() => setShowMagnifier(true)} onMouseLeave={() => setShowMagnifier(false)} onMouseMove={handleMouseMove} onClick={() => setIsLightboxOpen(true)}>
-                <img src={currentImageUrl} alt={product.name} className="w-full h-full object-cover" />
+                <img src={currentImageUrl} alt={product.name} className="w-full h-full object-cover" onError={handleImgError} />
                 {showMagnifier && (
                   <div className="absolute w-40 h-40 rounded-full border-4 border-white shadow-2xl pointer-events-none z-20 overflow-hidden hidden md:block" style={{ left: cursorPos.x, top: cursorPos.y, transform: 'translate(-50%, -50%)', backgroundImage: `url(${highResImageUrl})`, backgroundRepeat: 'no-repeat', backgroundPosition: `${bgPos.x}% ${bgPos.y}%`, backgroundSize: '500%' }} />
                 )}
                 <div className="absolute top-4 right-4 bg-white/80 backdrop-blur p-2 rounded-full text-leather-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"><Maximize2 size={20} /></div>
               </div>
-              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                {product.images.map((img, idx) => (
-                  <button key={idx} onClick={() => setSelectedImg(idx)} className={`w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${selectedImg === idx ? 'border-leather-600 ring-2 ring-leather-100' : 'border-transparent opacity-70 hover:opacity-100'}`}><img src={processImageUrl(img, 200)} alt="" className="w-full h-full object-cover" /></button>
-                ))}
-              </div>
+              {hasMultipleImages && (
+                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                  {product.images.map((img, idx) => (
+                    <button key={idx} onClick={() => setSelectedImg(idx)} aria-label={`Ver foto ${idx + 1}`} className={`w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${selectedImg === idx ? 'border-leather-600 ring-2 ring-leather-100' : 'border-transparent opacity-70 hover:opacity-100'}`}><img src={processImageUrl(img, 200)} alt="" className="w-full h-full object-cover" onError={handleImgError} /></button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex flex-col justify-center">
               <div className="mb-6">
-                 <span className="text-leather-600 font-bold uppercase tracking-wider text-sm">{product.category}</span>
+                 <div className="flex items-center justify-between gap-4 flex-wrap">
+                   <div className="flex items-center gap-3 flex-wrap">
+                     <span className="text-leather-600 font-bold uppercase tracking-wider text-sm">{product.category}</span>
+                     <span className="inline-flex items-center gap-1 bg-leather-50 border border-leather-200 text-leather-700 text-xs font-bold px-3 py-1 rounded-full"><Sparkles size={12} /> Pieza única hecha a mano</span>
+                   </div>
+                   <button onClick={handleShare} className="flex items-center gap-1 text-leather-400 hover:text-leather-700 transition-colors text-sm font-bold" aria-label="Compartir producto"><Share2 size={16} /> Compartir</button>
+                 </div>
                  <h1 className="text-4xl md:text-5xl font-serif font-bold text-leather-900 mt-2 mb-4">{product.name}</h1>
-                 <p className="text-3xl font-light text-leather-800 font-serif">{currency} {convertPrice(product.priceUYU).toLocaleString()}</p>
+                 <div className="flex items-center gap-4 flex-wrap">
+                   <p className="text-3xl font-light text-leather-800 font-serif">{formatPrice(convertPrice(product.priceUYU), currency)}</p>
+                   <CurrencyToggle />
+                 </div>
               </div>
               <div className="prose prose-lg text-leather-800 mb-10 leading-relaxed font-medium"><p>{product.description}</p></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 p-6 bg-leather-50 rounded-xl border border-leather-100">
                 <div><span className="font-bold text-leather-900 block mb-2">Materiales</span><ul className="text-sm text-leather-800 space-y-1">{product.materials.map(m => <li key={m} className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-leather-500"></div>{m}</li>)}</ul></div>
-                <div><span className="font-bold text-leather-900 block mb-2">Detalles</span><p className="text-sm text-leather-800 mb-2"><span className="font-semibold">Medidas:</span> {product.dimensions}</p><p className="text-sm text-leather-800"><span className="font-semibold">Colores:</span> {product.colors.join(', ')}</p></div>
+                <div><span className="font-bold text-leather-900 block mb-2">Detalles</span>{product.dimensions && <p className="text-sm text-leather-800 mb-2"><span className="font-semibold">Medidas:</span> {product.dimensions}</p>}{product.colors.length > 0 && <p className="text-sm text-leather-800"><span className="font-semibold">Colores:</span> {product.colors.join(', ')}</p>}</div>
               </div>
               {product.isSoldOut ? (
-                <div className="w-full bg-red-100 text-red-700 px-8 py-5 rounded-lg font-bold text-lg text-center border border-red-200">🚫 Producto Agotado</div>
+                <div className="space-y-4">
+                  <div className="w-full bg-red-50 text-red-700 px-8 py-5 rounded-lg font-bold text-lg text-center border border-red-200">Esta pieza ya encontró su dueño 💛</div>
+                  <a href={encargoUrl} target="_blank" rel="noopener noreferrer" className="w-full bg-leather-900 text-white px-8 py-5 rounded-lg font-bold text-lg hover:bg-leather-800 transition shadow-lg flex items-center justify-center gap-2">
+                    <MessageCircle size={22} className="fill-white" /> Pedir una similar por encargue
+                  </a>
+                </div>
               ) : (
-                <button onClick={() => addToCart(product)} className="w-full bg-leather-900 text-white px-8 py-5 rounded-lg font-bold text-lg hover:bg-leather-800 transition shadow-lg transform active:scale-95">Agregar al Carrito</button>
+                <div className="space-y-3">
+                  <button onClick={() => addToCart(product)} className="w-full bg-leather-900 text-white px-8 py-5 rounded-lg font-bold text-lg hover:bg-leather-800 transition shadow-lg transform active:scale-95 flex items-center justify-center gap-2">
+                    <ShoppingBag size={22} /> Agregar al Carrito
+                  </button>
+                  <a href={consultUrl} target="_blank" rel="noopener noreferrer" className="w-full border-2 border-[#25D366] text-[#128C7E] px-8 py-4 rounded-lg font-bold hover:bg-[#25D366]/10 transition flex items-center justify-center gap-2">
+                    <MessageCircle size={20} /> Consultar por WhatsApp
+                  </a>
+                </div>
               )}
             </div>
           </div>
-          
+
           {/* Related Products Section */}
           {relatedProducts.length > 0 && (
             <div className="border-t border-leather-100 pt-16">
@@ -891,10 +1299,10 @@ const ProductDetail = () => {
                   <div key={rp.id} className="group">
                     <Link to={`/producto/${rp.id}`} className="block">
                       <div className="aspect-square rounded-xl overflow-hidden mb-4 border border-leather-100 shadow-sm">
-                        <img src={processImageUrl(rp.images[0], 600)} alt={rp.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        <img src={imgSrc(rp.images, 600)} alt={rp.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" onError={handleImgError} />
                       </div>
                       <h3 className="font-bold text-leather-900 text-lg group-hover:text-leather-600 transition">{rp.name}</h3>
-                      <p className="text-leather-600 font-medium">{currency} {convertPrice(rp.priceUYU).toLocaleString()}</p>
+                      <p className="text-leather-600 font-medium">{formatPrice(convertPrice(rp.priceUYU), currency)}</p>
                     </Link>
                   </div>
                 ))}
@@ -904,19 +1312,122 @@ const ProductDetail = () => {
         </div>
       </div>
       {isLightboxOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4" onClick={() => setIsLightboxOpen(false)}>
-          <button className="absolute top-6 right-6 text-white/70 hover:text-white p-2"><X size={32} /></button>
-          <img src={highResImageUrl} alt={product.name} className="max-w-full max-h-full object-contain shadow-2xl rounded-sm cursor-default" onClick={(e) => e.stopPropagation()} />
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4" onClick={() => setIsLightboxOpen(false)} role="dialog" aria-modal="true" aria-label={`Foto de ${product.name}`}>
+          <button className="absolute top-6 right-6 text-white/70 hover:text-white p-2 z-10" aria-label="Cerrar"><X size={32} /></button>
+          {hasMultipleImages && (
+            <>
+              <button onClick={(e) => { e.stopPropagation(); setSelectedImg(prev => (prev - 1 + product.images.length) % product.images.length); }} className="absolute left-4 md:left-8 text-white/70 hover:text-white p-3 bg-white/10 rounded-full backdrop-blur-sm z-10" aria-label="Foto anterior"><ChevronLeft size={28} /></button>
+              <button onClick={(e) => { e.stopPropagation(); setSelectedImg(prev => (prev + 1) % product.images.length); }} className="absolute right-4 md:right-8 text-white/70 hover:text-white p-3 bg-white/10 rounded-full backdrop-blur-sm z-10" aria-label="Foto siguiente"><ChevronRight size={28} /></button>
+              <span className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/80 text-sm font-bold bg-white/10 px-4 py-1.5 rounded-full backdrop-blur-sm">{selectedImg + 1} / {product.images.length}</span>
+            </>
+          )}
+          <img src={highResImageUrl} alt={product.name} className="max-w-full max-h-full object-contain shadow-2xl rounded-sm cursor-default" onClick={(e) => e.stopPropagation()} onError={handleImgError} />
         </div>
       )}
     </>
   );
 };
 
-// Admin Panel Updates
+// --- Formulario de Producto (admin) ---
+// Componente estable fuera del panel para no perder lo tipeado en re-renders.
+const ProductForm = ({ initial, categories, exchangeRate, onSave, onCancel }: {
+  initial: Partial<Product>;
+  categories: string[];
+  exchangeRate: number;
+  onSave: (p: Product) => Promise<boolean>;
+  onCancel: () => void;
+}) => {
+  const [formData, setFormData] = useState<Partial<Product>>(
+    Object.keys(initial).length > 0 ? initial : { name: '', description: '', priceUYU: 0, priceUSD: 0, category: categories.find(c => c !== 'Todas') || 'Carteras', images: [''], materials: [], colors: [], dimensions: '', isFeatured: false, isSoldOut: false }
+  );
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    const p = {
+      ...formData,
+      id: formData.id || Date.now().toString(),
+      priceUSD: Math.round((formData.priceUYU || 0) / exchangeRate),
+      materials: typeof formData.materials === 'string' ? (formData.materials as unknown as string).split('\n').filter(Boolean) : (formData.materials || []).filter(Boolean),
+      colors: typeof formData.colors === 'string' ? (formData.colors as unknown as string).split('\n').filter(Boolean) : (formData.colors || []).filter(Boolean),
+      images: Array.isArray(formData.images) ? formData.images.filter(i => i !== '') : []
+    } as Product;
+    const ok = await onSave(p);
+    setSaving(false);
+    if (ok) onCancel();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-sm sm:max-w-2xl w-full border border-leather-200 my-8 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{formData.id ? 'Editar' : 'Nuevo'} Producto</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className="text-xs font-bold text-leather-700 mb-1 block">Nombre *</label><input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
+            <div><label className="text-xs font-bold text-leather-700 mb-1 block">Categoría</label><select className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{categories.filter(c => c !== 'Todas').map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+          </div>
+          <div><label className="text-xs font-bold text-leather-700 mb-1 block">Descripción</label><textarea className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-20" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-leather-700 mb-1 block">Precio (UYU) *</label>
+              <input type="number" min="0" className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.priceUYU} onChange={e => setFormData({...formData, priceUYU: Number(e.target.value)})} required />
+              {formData.priceUYU ? <p className="text-xs text-leather-400 mt-1">≈ USD {Math.round((formData.priceUYU || 0) / exchangeRate)} (cotización del día)</p> : null}
+            </div>
+            <div><label className="text-xs font-bold text-leather-700 mb-1 block">Dimensiones</label><input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="ej: 35cm x 30cm x 12cm" value={formData.dimensions} onChange={e => setFormData({...formData, dimensions: e.target.value})} /></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className="text-xs font-bold text-leather-700 mb-1 block">Materiales (uno por línea)</label><textarea className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm" placeholder="Cuero genuino&#10;Herrajes metálicos" value={Array.isArray(formData.materials) ? formData.materials.join('\n') : formData.materials} onChange={e => setFormData({...formData, materials: e.target.value.split('\n') as any})} /></div>
+            <div><label className="text-xs font-bold text-leather-700 mb-1 block">Colores (uno por línea)</label><textarea className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm" placeholder="Marrón&#10;Negro" value={Array.isArray(formData.colors) ? formData.colors.join('\n') : formData.colors} onChange={e => setFormData({...formData, colors: e.target.value.split('\n') as any})} /></div>
+          </div>
+          <div className="flex flex-wrap gap-6">
+            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isFeatured || false} onChange={e => setFormData({...formData, isFeatured: e.target.checked})} className="w-4 h-4 rounded border-leather-300 text-leather-600 focus:ring-leather-500" /><span className="text-sm font-bold text-leather-700">⭐ Destacado</span></label>
+            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isSoldOut || false} onChange={e => setFormData({...formData, isSoldOut: e.target.checked})} className="w-4 h-4 rounded border-leather-300 text-red-600 focus:ring-red-500" /><span className="text-sm font-bold text-red-600">🚫 Agotado</span></label>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-leather-700 mb-1 block">Fotos del Producto</label>
+            <label className={`flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-4 hover:border-leather-500 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+              <Upload size={20} className="text-leather-500" />
+              <span className="text-sm text-leather-600 font-medium">{uploading ? 'Subiendo...' : 'Tocá acá para elegir las fotos'}</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={async (e) => {
+                const files = e.target.files ? Array.from(e.target.files) : [];
+                if (files.length === 0) return;
+                const MAX_SIZE = 5 * 1024 * 1024;
+                const invalid = files.find(f => f.size > MAX_SIZE);
+                if (invalid) { alert(`"${invalid.name}" es muy grande. Máximo 5MB por imagen.`); return; }
+                setUploading(true);
+                try {
+                  const urls = await Promise.all(files.map(f => StorageService.uploadImage(f, 'products')));
+                  setFormData(prev => ({ ...prev, images: [...(prev.images || []).filter(i => i !== ''), ...urls] }));
+                } catch (err) { console.error('Upload error:', err); alert('Error al subir imagen. Verificá tu conexión.'); }
+                setUploading(false);
+                e.target.value = '';
+              }} />
+            </label>
+            {formData.images && formData.images.filter(i => i).length > 0 && (
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {formData.images.filter(i => i).map((img, idx) => (
+                  <div key={idx} className="relative group">
+                    <img src={processImageUrl(img, 100)} className="w-16 h-16 object-cover rounded border" alt={`Imagen ${idx + 1}`} />
+                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: (prev.images || []).filter(i => i !== '').filter((_, i) => i !== idx) }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition" aria-label="Quitar imagen">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className="text-xs text-leather-400 mt-2 block">O pega URLs directamente:</label>
+            <textarea className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm font-mono mt-1" value={Array.isArray(formData.images) ? formData.images.join('\n') : ''} onChange={e => setFormData({...formData, images: e.target.value.split('\n')})} />
+          </div>
+          <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={onCancel} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" disabled={uploading || saving} className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar'}</button></div>
+        </form>
+    </div></div>
+  );
+};
+
+// --- Panel de Administración ---
 const AdminPanel = () => {
   const { products, fairs, history, blogPosts, categories, exchangeRate, logout, addProduct, updateProduct, deleteProduct, addFair, updateFair, deleteFair, addHistoryEvent, updateHistoryEvent, deleteHistoryEvent, addBlogPost, updateBlogPost, deleteBlogPost, addCategory, deleteCategory } = useStore();
-  const [activeTab, setActiveTab] = useState<'products' | 'fairs' | 'history' | 'blog' | 'categories' | 'system'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'fairs' | 'history' | 'blog' | 'categories' | 'ayuda' | 'system'>('products');
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [editingFair, setEditingFair] = useState<Partial<Fair> | null>(null);
   const [editingHistory, setEditingHistory] = useState<Partial<HistoryEvent> | null>(null);
@@ -925,7 +1436,7 @@ const AdminPanel = () => {
   const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => { document.title = "Admin - MARIEL'LA"; }, []);
+  usePageMeta("Panel de Administración - MARIEL'LA");
 
   const handleLogout = () => { logout(); navigate('/'); };
 
@@ -944,104 +1455,100 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const ProductForm = () => {
-    const [formData, setFormData] = useState<Partial<Product>>(editingProduct || { name: '', description: '', priceUYU: 0, priceUSD: 0, category: categories[1] || 'Carteras', images: [''], materials: [], colors: [], dimensions: '', isFeatured: false, isSoldOut: false });
-    const [uploading, setUploading] = useState(false);
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const p = { ...formData, id: formData.id || Date.now().toString(), materials: typeof formData.materials === 'string' ? (formData.materials as string).split('\n').filter(Boolean) : formData.materials, colors: typeof formData.colors === 'string' ? (formData.colors as string).split('\n').filter(Boolean) : formData.colors, images: Array.isArray(formData.images) ? formData.images.filter(i => i !== '') : [] } as Product;
-      if (formData.id) updateProduct(p); else addProduct(p);
-      setEditingProduct(null);
-    };
-    return (
-      <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-sm sm:max-w-2xl w-full border border-leather-200 my-8 max-h-[90vh] overflow-y-auto">
-          <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{formData.id ? 'Editar' : 'Nuevo'} Producto</h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Nombre *</label><input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required /></div>
-              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Categoría</label><select style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as any})}>{categories.filter(c => c !== 'Todas').map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-            </div>
-            <div><label className="text-xs font-bold text-leather-700 mb-1 block">Descripción</label><textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-20" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-leather-700 mb-1 block">Precio (UYU) *</label>
-                <input style={{backgroundColor: 'white'}} type="number" min="0" className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={formData.priceUYU} onChange={e => setFormData({...formData, priceUYU: Number(e.target.value)})} required />
-                {formData.priceUYU ? <p className="text-xs text-leather-400 mt-1">≈ USD {Math.round((formData.priceUYU || 0) / exchangeRate)}</p> : null}
-              </div>
-              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Dimensiones</label><input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="ej: 35cm x 30cm x 12cm" value={formData.dimensions} onChange={e => setFormData({...formData, dimensions: e.target.value})} /></div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Materiales (uno por línea)</label><textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm" placeholder="Cuero genuino&#10;Herrajes metálicos" value={Array.isArray(formData.materials) ? formData.materials.join('\n') : formData.materials} onChange={e => setFormData({...formData, materials: e.target.value.split('\n') as any})} /></div>
-              <div><label className="text-xs font-bold text-leather-700 mb-1 block">Colores (uno por línea)</label><textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm" placeholder="Marrón&#10;Negro" value={Array.isArray(formData.colors) ? formData.colors.join('\n') : formData.colors} onChange={e => setFormData({...formData, colors: e.target.value.split('\n') as any})} /></div>
-            </div>
-            <div className="flex flex-wrap gap-6">
-              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isFeatured || false} onChange={e => setFormData({...formData, isFeatured: e.target.checked})} className="w-4 h-4 rounded border-leather-300 text-leather-600 focus:ring-leather-500" /><span className="text-sm font-bold text-leather-700">⭐ Destacado</span></label>
-              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formData.isSoldOut || false} onChange={e => setFormData({...formData, isSoldOut: e.target.checked})} className="w-4 h-4 rounded border-leather-300 text-red-600 focus:ring-red-500" /><span className="text-sm font-bold text-red-600">🚫 Agotado</span></label>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-leather-700 mb-1 block">Fotos del Producto</label>
-              <label className={`flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-4 hover:border-leather-500 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                <Upload size={20} className="text-leather-500" />
-                <span className="text-sm text-leather-600 font-medium">{uploading ? 'Subiendo...' : 'Click para seleccionar imágenes'}</span>
-                <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={async (e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length === 0) return;
-                  const MAX_SIZE = 5 * 1024 * 1024;
-                  const invalid = files.find(f => f.size > MAX_SIZE);
-                  if (invalid) { alert(`"${invalid.name}" es muy grande. Máximo 5MB por imagen.`); return; }
-                  setUploading(true);
-                  try {
-                    const urls = await Promise.all(files.map(f => StorageService.uploadImage(f, 'products')));
-                    setFormData(prev => ({ ...prev, images: [...(prev.images || []).filter(i => i !== ''), ...urls] }));
-                  } catch (err) { console.error('Upload error:', err); alert('Error al subir imagen. Verificá tu conexión.'); }
-                  setUploading(false);
-                }} />
-              </label>
-              {formData.images && formData.images.filter(i => i).length > 0 && (
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  {formData.images.filter(i => i).map((img, idx) => (
-                    <div key={idx} className="relative group">
-                      <img src={processImageUrl(img, 100)} className="w-16 h-16 object-cover rounded border" alt={`Imagen ${idx + 1}`} />
-                      <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: (prev.images || []).filter((_, i) => i !== idx) }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition">×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <label className="text-xs text-leather-400 mt-2 block">O pega URLs directamente:</label>
-              <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16 text-sm font-mono mt-1" value={Array.isArray(formData.images) ? formData.images.join('\n') : ''} onChange={e => setFormData({...formData, images: e.target.value.split('\n')})} />
-            </div>
-            <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setEditingProduct(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" disabled={uploading} className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold disabled:opacity-50">Guardar</button></div>
-          </form>
-      </div></div>
-    );
-  };
+  const tabs: { key: typeof activeTab; label: string }[] = [
+    { key: 'products', label: 'Productos' },
+    { key: 'categories', label: 'Categorías' },
+    { key: 'fairs', label: 'Ferias' },
+    { key: 'history', label: 'Historia' },
+    { key: 'blog', label: 'Blog' },
+    { key: 'ayuda', label: '❓ Ayuda' },
+    { key: 'system', label: 'Sistema' },
+  ];
+
+  const HelpStep = ({ n, title, children }: { n: number; title: string; children: ReactNode }) => (
+    <div className="flex gap-4">
+      <div className="w-8 h-8 rounded-full bg-leather-900 text-white flex items-center justify-center font-bold flex-shrink-0">{n}</div>
+      <div>
+        <h4 className="font-bold text-leather-900 mb-1">{title}</h4>
+        <div className="text-leather-700 text-sm leading-relaxed font-medium">{children}</div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-leather-50 pt-36 pb-12 animate-fade-in-up">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between items-center mb-10 bg-white p-6 rounded-xl shadow-sm border border-leather-100">
-          <div><h1 className="text-2xl font-bold text-leather-900">Panel de Administración</h1></div>
+        <div className="flex justify-between items-center mb-10 bg-white p-6 rounded-xl shadow-sm border border-leather-100 gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold text-leather-900">Panel de Administración</h1>
+            <p className="text-sm text-leather-500 font-medium mt-1">Hola Mariela 👋 Todo lo que cambies acá se publica al instante.</p>
+          </div>
           <button onClick={handleLogout} className="flex items-center gap-2 text-red-600 font-medium px-4 py-2 hover:bg-red-50 rounded-lg"><LogOut size={18} /> Salir</button>
         </div>
         <div className="bg-white rounded-xl shadow-lg border border-leather-200 min-h-[600px] overflow-hidden">
           <div className="border-b border-leather-200 px-8 py-5 flex gap-8 bg-leather-50/50 overflow-x-auto">
-            {['products', 'categories', 'fairs', 'history', 'blog', 'system'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab as any)} className={`text-lg font-bold pb-1 border-b-2 capitalize whitespace-nowrap ${activeTab === tab ? 'border-leather-900 text-leather-900' : 'border-transparent text-leather-400'}`}>
-                {tab === 'products' ? 'Productos' : tab === 'categories' ? 'Categorías' : tab === 'fairs' ? 'Ferias' : tab === 'history' ? 'Historia' : tab === 'blog' ? 'Blog' : 'Sistema'}
+            {tabs.map(tab => (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`text-lg font-bold pb-1 border-b-2 whitespace-nowrap ${activeTab === tab.key ? 'border-leather-900 text-leather-900' : 'border-transparent text-leather-400'}`}>
+                {tab.label}
               </button>
             ))}
           </div>
           <div className="p-8">
+            {activeTab === 'ayuda' && (
+              <div className="animate-fade-in-up max-w-3xl space-y-8">
+                <div className="bg-leather-50 p-6 rounded-xl border border-leather-200">
+                  <h2 className="text-2xl font-serif font-bold text-leather-900 mb-2 flex items-center gap-2"><HelpCircle size={24} /> Guía rápida</h2>
+                  <p className="text-leather-700 font-medium">Todo lo que hagas acá se guarda solo y se ve al instante en la página. No tengas miedo de tocar: siempre podés editar o borrar después.</p>
+                </div>
+
+                <div className="space-y-6">
+                  <h3 className="text-xl font-serif font-bold text-leather-900 border-b border-leather-100 pb-2">📦 Para vender una pieza nueva</h3>
+                  <HelpStep n={1} title="Sacale buenas fotos">Con luz natural, sobre fondo claro. Podés sacar varias: de frente, de costado y del detalle que más te guste.</HelpStep>
+                  <HelpStep n={2} title="Entrá a 'Productos' y tocá 'Nuevo Producto'">Poné el nombre, una descripción linda (contá qué la hace única), el precio en pesos y las medidas.</HelpStep>
+                  <HelpStep n={3} title="Subí las fotos">Tocá "Tocá acá para elegir las fotos" y elegilas de la galería del celular. Podés elegir varias juntas.</HelpStep>
+                  <HelpStep n={4} title="Guardá">Tocá "Guardar" y listo: ya está publicada en la tienda. El precio en dólares se calcula solo con la cotización del día.</HelpStep>
+                </div>
+
+                <div className="space-y-6">
+                  <h3 className="text-xl font-serif font-bold text-leather-900 border-b border-leather-100 pb-2">✅ Cuando vendés una pieza</h3>
+                  <p className="text-leather-700 text-sm font-medium">En la lista de productos, tocá el botón <span className="font-bold">"Agotado"</span> de esa pieza. Queda marcada como vendida en la tienda (no hace falta borrarla: así los clientes ven todo lo que hiciste y pueden pedir una similar por encargue).</p>
+                </div>
+
+                <div className="space-y-6">
+                  <h3 className="text-xl font-serif font-bold text-leather-900 border-b border-leather-100 pb-2">⭐ Piezas destacadas</h3>
+                  <p className="text-leather-700 text-sm font-medium">Las piezas marcadas como <span className="font-bold">"Destacada"</span> aparecen primero en la portada y en el catálogo. Elegí tus 3 a 6 favoritas.</p>
+                </div>
+
+                <div className="space-y-6">
+                  <h3 className="text-xl font-serif font-bold text-leather-900 border-b border-leather-100 pb-2">📅 Ferias, 📖 Historia y ✍️ Blog</h3>
+                  <p className="text-leather-700 text-sm font-medium"><span className="font-bold">Ferias:</span> cargá las próximas fechas en la pestaña Ferias (aparecen en la portada). Cuando pasan, editá y cambiá el estado a "Pasada".<br/><br/><span className="font-bold">Blog:</span> para contar novedades (una nota de radio, una feria linda, consejos de cuidado del cuero). Con título, un textito y una foto alcanza.<br/><br/><span className="font-bold">Historia:</span> los hitos que se ven en la página "Historia".</p>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl space-y-3">
+                  <h3 className="text-lg font-bold text-amber-900 flex items-center gap-2"><AlertCircle size={20}/> Si algo no funciona</h3>
+                  <ul className="text-amber-900 text-sm space-y-2 font-medium list-disc pl-5">
+                    <li>Fijate que el celular tenga internet.</li>
+                    <li>Recargá la página y probá de nuevo.</li>
+                    <li>Si aparece un cartel rojo al guardar, esperá un ratito y volvé a intentar.</li>
+                    <li>Si nada funciona… llamá a Brian 😉</li>
+                  </ul>
+                </div>
+              </div>
+            )}
             {activeTab === 'system' && (
-              <div className="animate-fade-in max-w-2xl">
+              <div className="animate-fade-in-up max-w-2xl">
                  <h2 className="text-2xl font-serif font-bold text-leather-900 mb-4">Estado del Sistema</h2>
                  <div className="bg-green-50 p-6 rounded-xl border border-green-200 mb-6">
                    <h3 className="font-bold text-green-800 mb-2 flex items-center gap-2"><CheckCircle size={20} className="text-green-600" /> Base de datos conectada</h3>
-                   <p className="text-green-700 text-sm">Los datos se guardan automáticamente en la nube (Supabase). Todos los cambios que hagas desde este panel son visibles inmediatamente para todos los visitantes de la web.</p>
+                   <p className="text-green-700 text-sm">Los datos se guardan automáticamente en la nube. Todos los cambios que hagas desde este panel son visibles inmediatamente para todos los visitantes de la web.</p>
+                 </div>
+                 <div className="bg-blue-50 p-6 rounded-xl border border-blue-200 mb-6">
+                   <h3 className="font-bold text-blue-800 mb-2 flex items-center gap-2"><Info size={20} /> Cotización del día</h3>
+                   <p className="text-blue-700 text-sm">1 USD = $U {exchangeRate.toFixed(2)}. Los precios en dólares de la tienda se calculan automáticamente con este valor.</p>
                  </div>
                  <div className="bg-leather-50 p-6 rounded-xl border border-leather-200">
                    <h3 className="font-bold text-leather-900 mb-3 flex items-center gap-2"><Database size={20}/> Exportar Datos (Backup)</h3>
-                   <p className="text-sm text-leather-600 mb-4">Exportar una copia de seguridad de todos los datos actuales.</p>
+                   <p className="text-sm text-leather-600 mb-4">Copia de seguridad de todos los datos actuales (para guardar en un archivo o mandarle a Brian).</p>
                    <button onClick={copyToClipboard} className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-white transition-all ${copied ? 'bg-green-600' : 'bg-leather-900 hover:bg-leather-800'}`}>
                       {copied ? <><CheckCircle size={20}/> ¡Copiado!</> : <><Copy size={20}/> Copiar Backup JSON</>}
                    </button>
@@ -1049,71 +1556,97 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               </div>
             )}
             {activeTab === 'categories' && (
-              <div className="animate-fade-in max-w-xl">
+              <div className="animate-fade-in-up max-w-xl">
                 <div className="flex gap-4 mb-8">
-                  <input style={{backgroundColor: 'white'}} className="flex-1 !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Nueva Categoría" value={newCategory} onChange={e => setNewCategory(e.target.value)} />
-                  <button onClick={() => { if(newCategory) { addCategory(newCategory); setNewCategory(''); } }} className="bg-leather-900 text-white px-6 rounded-lg font-bold hover:bg-leather-800 transition">Agregar</button>
+                  <input className="flex-1 p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Nueva Categoría" value={newCategory} onChange={e => setNewCategory(e.target.value)} />
+                  <button onClick={() => { const c = newCategory.trim(); if(c) { addCategory(c); setNewCategory(''); } }} className="bg-leather-900 text-white px-6 rounded-lg font-bold hover:bg-leather-800 transition">Agregar</button>
                 </div>
                 <div className="space-y-3">
                   {categories.map(cat => (
                     <div key={cat} className="flex justify-between items-center p-4 bg-leather-50 rounded-lg border border-leather-100">
                       <span className="font-bold text-leather-900">{cat}</span>
-                      {cat !== 'Todas' && <button onClick={() => { if(confirm('¿Eliminar categoría?')) deleteCategory(cat); }} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={18}/></button>}
+                      {cat !== 'Todas' && <button onClick={() => { if(confirm(`¿Eliminar la categoría "${cat}"?`)) deleteCategory(cat); }} className="text-red-500 hover:bg-red-50 p-2 rounded" aria-label={`Eliminar ${cat}`}><Trash2 size={18}/></button>}
                     </div>
                   ))}
                 </div>
               </div>
             )}
             {activeTab === 'products' && (
-              <div className="animate-fade-in">
+              <div className="animate-fade-in-up">
                 <button onClick={() => setEditingProduct({})} className="mb-6 flex items-center gap-2 bg-leather-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-leather-800 transition"><Plus size={20} /> Nuevo Producto</button>
                 <div className="grid gap-4">{products.map(p => (
-                  <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white">
-                    <div className="flex gap-4 items-center">
-                      <img src={processImageUrl(p.images[0], 100)} className="w-12 h-12 object-cover rounded" alt="" />
-                      <div>
-                        <span className="font-bold text-leather-900 block">{p.name}</span>
-                        <span className="text-xs text-leather-500">{p.category}</span>
+                  <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white gap-4 flex-wrap">
+                    <div className="flex gap-4 items-center min-w-0">
+                      <img src={imgSrc(p.images, 100)} className="w-12 h-12 object-cover rounded flex-shrink-0" alt="" onError={handleImgError} />
+                      <div className="min-w-0">
+                        <span className="font-bold text-leather-900 block truncate">{p.name}</span>
+                        <span className="text-xs text-leather-500">{p.category} · $U {p.priceUYU.toLocaleString('es-UY')}</span>
                       </div>
                     </div>
-                    <div className="flex gap-2"><button onClick={() => setEditingProduct(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => { if(confirm('¿Eliminar este producto?')) deleteProduct(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <button
+                        onClick={() => updateProduct({ ...p, isFeatured: !p.isFeatured })}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${p.isFeatured ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-leather-200 text-leather-400 hover:border-amber-300 hover:text-amber-700'}`}
+                        aria-pressed={p.isFeatured}
+                      >⭐ {p.isFeatured ? 'Destacada' : 'Destacar'}</button>
+                      <button
+                        onClick={() => updateProduct({ ...p, isSoldOut: !p.isSoldOut })}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${p.isSoldOut ? 'bg-red-100 border-red-300 text-red-700' : 'bg-white border-leather-200 text-leather-400 hover:border-red-300 hover:text-red-600'}`}
+                        aria-pressed={p.isSoldOut}
+                      >{p.isSoldOut ? '🚫 Agotada' : 'Marcar agotada'}</button>
+                      <button onClick={() => setEditingProduct(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded" aria-label={`Editar ${p.name}`}><Edit size={18}/></button>
+                      <button onClick={() => { if(confirm(`¿Eliminar "${p.name}"? Esta acción no se puede deshacer.`)) deleteProduct(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded" aria-label={`Eliminar ${p.name}`}><Trash2 size={18}/></button>
+                    </div>
                   </div>
                 ))}</div>
-                {editingProduct && <ProductForm />}
+                {products.length === 0 && (
+                  <div className="text-center py-12 text-leather-400 font-medium">
+                    <Package size={40} className="mx-auto mb-3 text-leather-200" />
+                    Todavía no hay productos. ¡Agregá el primero!
+                  </div>
+                )}
+                {editingProduct && <ProductForm initial={editingProduct} categories={categories} exchangeRate={exchangeRate} onSave={(p) => editingProduct.id ? updateProduct(p) : addProduct(p)} onCancel={() => setEditingProduct(null)} />}
               </div>
             )}
             {activeTab === 'fairs' && (
-              <div className="animate-fade-in">
+              <div className="animate-fade-in-up">
                  <button onClick={() => setEditingFair({})} className="mb-6 flex items-center gap-2 bg-leather-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-leather-800 transition"><Plus size={20} /> Nueva Feria</button>
                  <div className="grid gap-4">{fairs.map(f => (
-                   <div key={f.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white">
+                   <div key={f.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white gap-4">
                       <div>
                         <span className="font-bold text-leather-900 block">{f.name}</span>
-                        <span className="text-sm text-leather-500">{f.date} - {f.city}</span>
+                        <span className="text-sm text-leather-500">{f.date} — {f.city}</span>
                       </div>
-                      <div className="flex gap-2"><button onClick={() => setEditingFair(f)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => { if(confirm('¿Eliminar esta feria?')) deleteFair(f.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
+                      <div className="flex gap-2 items-center">
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${f.status === 'upcoming' ? 'bg-green-100 text-green-700' : 'bg-leather-100 text-leather-500'}`}>{f.status === 'upcoming' ? 'Próxima' : 'Pasada'}</span>
+                        <button onClick={() => setEditingFair(f)} className="p-2 text-blue-600 hover:bg-blue-50 rounded" aria-label={`Editar ${f.name}`}><Edit size={18}/></button>
+                        <button onClick={() => { if(confirm(`¿Eliminar la feria "${f.name}"?`)) deleteFair(f.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded" aria-label={`Eliminar ${f.name}`}><Trash2 size={18}/></button>
+                      </div>
                    </div>
                  ))}</div>
                  {editingFair && (
-                   <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200">
-                     <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">Editar Feria</h3>
-                     <form onSubmit={(e) => { e.preventDefault(); const f = { ...editingFair, id: editingFair.id || Date.now().toString() } as Fair; if(editingFair.id) updateFair(f); else addFair(f); setEditingFair(null); }} className="space-y-4">
-                       <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Nombre" value={editingFair.name || ''} onChange={e => setEditingFair({...editingFair, name: e.target.value})} />
-                       <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" type="date" value={editingFair.date || ''} onChange={e => setEditingFair({...editingFair, date: e.target.value})} />
-                       <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Ciudad" value={editingFair.city || ''} onChange={e => setEditingFair({...editingFair, city: e.target.value})} />
-                       <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Ubicación" value={editingFair.location || ''} onChange={e => setEditingFair({...editingFair, location: e.target.value})} />
-                       <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-24" placeholder="Descripción" value={editingFair.description || ''} onChange={e => setEditingFair({...editingFair, description: e.target.value})} />
-                       <select style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={editingFair.status || 'upcoming'} onChange={e => setEditingFair({...editingFair, status: e.target.value as any})}><option value="upcoming">Próxima</option><option value="past">Pasada</option></select>
+                   <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200 my-8">
+                     <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{editingFair.id ? 'Editar' : 'Nueva'} Feria</h3>
+                     <form onSubmit={async (e) => { e.preventDefault(); const f = { ...editingFair, id: editingFair.id || Date.now().toString(), status: editingFair.status || 'upcoming' } as Fair; const ok = await (editingFair.id ? updateFair(f) : addFair(f)); if (ok) setEditingFair(null); }} className="space-y-4">
+                       <div><label className="text-xs font-bold text-leather-700 mb-1 block">Nombre *</label><input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="ej: Feria Ideas+" value={editingFair.name || ''} onChange={e => setEditingFair({...editingFair, name: e.target.value})} required /></div>
+                       <div><label className="text-xs font-bold text-leather-700 mb-1 block">Fecha *</label><input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" type="date" value={editingFair.date || ''} onChange={e => setEditingFair({...editingFair, date: e.target.value})} required /></div>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                         <div><label className="text-xs font-bold text-leather-700 mb-1 block">Ciudad</label><input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="ej: Montevideo" value={editingFair.city || ''} onChange={e => setEditingFair({...editingFair, city: e.target.value})} /></div>
+                         <div><label className="text-xs font-bold text-leather-700 mb-1 block">Lugar</label><input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="ej: Parque Rodó" value={editingFair.location || ''} onChange={e => setEditingFair({...editingFair, location: e.target.value})} /></div>
+                       </div>
+                       <div><label className="text-xs font-bold text-leather-700 mb-1 block">Descripción</label><textarea className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-24" placeholder="Contá algo sobre la feria" value={editingFair.description || ''} onChange={e => setEditingFair({...editingFair, description: e.target.value})} /></div>
+                       <div><label className="text-xs font-bold text-leather-700 mb-1 block">Estado</label><select className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" value={editingFair.status || 'upcoming'} onChange={e => setEditingFair({...editingFair, status: e.target.value as Fair['status']})}><option value="upcoming">Próxima</option><option value="past">Pasada</option></select></div>
                        <div>
                          <label className="text-xs font-bold text-leather-700 mb-1 block">Imagen</label>
                          <label className="flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-3 hover:border-leather-500 transition-colors">
                            <Upload size={18} className="text-leather-500" /><span className="text-sm text-leather-600">Subir foto</span>
                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                              const file = e.target.files?.[0]; if (!file) return;
-                             try { const url = await StorageService.uploadImage(file, 'fairs'); setEditingFair({...editingFair, imageUrl: url}); } catch { alert('Error al subir'); }
+                             try { const url = await StorageService.uploadImage(file, 'fairs'); setEditingFair(prev => ({...prev, imageUrl: url})); } catch { alert('Error al subir la foto. Verificá tu conexión.'); }
+                             e.target.value = '';
                            }} />
                          </label>
-                         {editingFair.imageUrl && <img src={processImageUrl(editingFair.imageUrl, 100)} className="w-16 h-16 object-cover rounded mt-2" alt="" />}
+                         {editingFair.imageUrl && <img src={processImageUrl(editingFair.imageUrl, 100)} className="w-16 h-16 object-cover rounded mt-2" alt="" onError={handleImgError} />}
                        </div>
                        <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditingFair(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
                      </form>
@@ -1122,25 +1655,28 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               </div>
             )}
              {activeTab === 'blog' && (
-               <div className="animate-fade-in">
+               <div className="animate-fade-in-up">
                   <button onClick={() => setEditingBlog({})} className="mb-6 flex items-center gap-2 bg-leather-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-leather-800 transition"><Plus size={20} /> Nuevo Post</button>
                   <div className="grid gap-4">{blogPosts.map(p => (
-                    <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white">
-                       <span className="font-bold text-leather-900">{p.title}</span>
-                       <div className="flex gap-2"><button onClick={() => setEditingBlog(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => { if(confirm('¿Eliminar este post?')) deleteBlogPost(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
+                    <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white gap-4">
+                       <div className="min-w-0">
+                         <span className="font-bold text-leather-900 block truncate">{p.title}</span>
+                         <span className="text-xs text-leather-500">{p.date}</span>
+                       </div>
+                       <div className="flex gap-2"><button onClick={() => setEditingBlog(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded" aria-label={`Editar ${p.title}`}><Edit size={18}/></button><button onClick={() => { if(confirm(`¿Eliminar el post "${p.title}"?`)) deleteBlogPost(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded" aria-label={`Eliminar ${p.title}`}><Trash2 size={18}/></button></div>
                     </div>
                   ))}</div>
                   {editingBlog && (
-                    <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200">
-                      <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">Editar Post</h3>
-                      <form onSubmit={(e) => { e.preventDefault(); const b = { ...editingBlog, id: editingBlog.id || Date.now().toString(), excerpt: editingBlog.excerpt || (editingBlog.content || '').substring(0, 150) + '...', date: editingBlog.date || new Date().toLocaleDateString('es-UY', { day: 'numeric', month: 'short', year: 'numeric' }), readTime: editingBlog.readTime || `${Math.max(1, Math.ceil((editingBlog.content || '').split(' ').length / 200))} min lectura` } as BlogPost; if(editingBlog.id) updateBlogPost(b); else addBlogPost(b); setEditingBlog(null); }} className="space-y-4">
-                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Título *" value={editingBlog.title || ''} onChange={e => setEditingBlog({...editingBlog, title: e.target.value})} required />
-                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none text-sm" placeholder="Resumen corto (se genera automáticamente si lo dejás vacío)" value={editingBlog.excerpt || ''} onChange={e => setEditingBlog({...editingBlog, excerpt: e.target.value})} />
-                        <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-32" placeholder="Contenido del artículo *" value={editingBlog.content || ''} onChange={e => setEditingBlog({...editingBlog, content: e.target.value})} required />
+                    <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200 my-8 max-h-[90vh] overflow-y-auto">
+                      <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{editingBlog.id ? 'Editar' : 'Nuevo'} Post</h3>
+                      <form onSubmit={async (e) => { e.preventDefault(); const b = { ...editingBlog, id: editingBlog.id || Date.now().toString(), author: editingBlog.author || 'Mariela Calistro', excerpt: editingBlog.excerpt || (editingBlog.content || '').substring(0, 150) + '...', date: editingBlog.date || new Date().toLocaleDateString('es-UY', { day: 'numeric', month: 'short', year: 'numeric' }), readTime: editingBlog.readTime || `${Math.max(1, Math.ceil((editingBlog.content || '').split(' ').length / 200))} min lectura` } as BlogPost; const ok = await (editingBlog.id ? updateBlogPost(b) : addBlogPost(b)); if (ok) setEditingBlog(null); }} className="space-y-4">
+                        <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Título *" value={editingBlog.title || ''} onChange={e => setEditingBlog({...editingBlog, title: e.target.value})} required />
+                        <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none text-sm" placeholder="Resumen corto (se genera automáticamente si lo dejás vacío)" value={editingBlog.excerpt || ''} onChange={e => setEditingBlog({...editingBlog, excerpt: e.target.value})} />
+                        <textarea className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-32" placeholder="Contenido del artículo * (separá los párrafos con Enter)" value={editingBlog.content || ''} onChange={e => setEditingBlog({...editingBlog, content: e.target.value})} required />
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Autor" value={editingBlog.author || 'Mariela Calistro'} onChange={e => setEditingBlog({...editingBlog, author: e.target.value})} />
-                          <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none text-sm" placeholder="Fecha (ej: 20 Mar 2025)" value={editingBlog.date || ''} onChange={e => setEditingBlog({...editingBlog, date: e.target.value})} />
-                          <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none text-sm" placeholder="Tiempo lectura (ej: 3 min)" value={editingBlog.readTime || ''} onChange={e => setEditingBlog({...editingBlog, readTime: e.target.value})} />
+                          <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Autor" value={editingBlog.author ?? 'Mariela Calistro'} onChange={e => setEditingBlog({...editingBlog, author: e.target.value})} />
+                          <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none text-sm" placeholder="Fecha (ej: 20 Mar 2026)" value={editingBlog.date || ''} onChange={e => setEditingBlog({...editingBlog, date: e.target.value})} />
+                          <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none text-sm" placeholder="Tiempo lectura (ej: 3 min)" value={editingBlog.readTime || ''} onChange={e => setEditingBlog({...editingBlog, readTime: e.target.value})} />
                         </div>
                         <div>
                           <label className="text-xs font-bold text-leather-700 mb-1 block">Imagen</label>
@@ -1148,11 +1684,12 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                             <Upload size={18} className="text-leather-500" /><span className="text-sm text-leather-600">Subir foto</span>
                             <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                               const file = e.target.files?.[0]; if (!file) return;
-                              try { const url = await StorageService.uploadImage(file, 'blog'); setEditingBlog({...editingBlog, imageUrl: url}); } catch { alert('Error al subir'); }
+                              try { const url = await StorageService.uploadImage(file, 'blog'); setEditingBlog(prev => ({...prev, imageUrl: url})); } catch { alert('Error al subir la foto. Verificá tu conexión.'); }
+                              e.target.value = '';
                             }} />
                           </label>
-                          {editingBlog.imageUrl && <img src={processImageUrl(editingBlog.imageUrl, 100)} className="w-16 h-16 object-cover rounded mt-2" alt="" />}
-                          <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none mt-2 text-sm" placeholder="O pegar URL de imagen" value={editingBlog.imageUrl || ''} onChange={e => setEditingBlog({...editingBlog, imageUrl: e.target.value})} />
+                          {editingBlog.imageUrl && <img src={processImageUrl(editingBlog.imageUrl, 100)} className="w-16 h-16 object-cover rounded mt-2" alt="" onError={handleImgError} />}
+                          <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none mt-2 text-sm" placeholder="O pegar URL de imagen" value={editingBlog.imageUrl || ''} onChange={e => setEditingBlog({...editingBlog, imageUrl: e.target.value})} />
                         </div>
                         <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditingBlog(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
                       </form>
@@ -1161,22 +1698,34 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                </div>
              )}
              {activeTab === 'history' && (
-               <div className="animate-fade-in">
+               <div className="animate-fade-in-up">
                   <button onClick={() => setEditingHistory({})} className="mb-6 flex items-center gap-2 bg-leather-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-leather-800 transition"><Plus size={20} /> Nuevo Hito</button>
                   <div className="grid gap-4">{history.map(p => (
-                    <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white">
-                       <span className="font-bold text-leather-900">{p.year} - {p.title}</span>
-                       <div className="flex gap-2"><button onClick={() => setEditingHistory(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18}/></button><button onClick={() => { if(confirm('¿Eliminar este hito?')) deleteHistoryEvent(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18}/></button></div>
+                    <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white gap-4">
+                       <span className="font-bold text-leather-900">{p.year} — {p.title}</span>
+                       <div className="flex gap-2"><button onClick={() => setEditingHistory(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded" aria-label={`Editar ${p.title}`}><Edit size={18}/></button><button onClick={() => { if(confirm(`¿Eliminar el hito "${p.title}"?`)) deleteHistoryEvent(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded" aria-label={`Eliminar ${p.title}`}><Trash2 size={18}/></button></div>
                     </div>
                   ))}</div>
                   {editingHistory && (
-                    <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200">
-                      <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">Editar Historia</h3>
-                      <form onSubmit={(e) => { e.preventDefault(); const h = { ...editingHistory, id: editingHistory.id || Date.now().toString() } as HistoryEvent; if(editingHistory.id) updateHistoryEvent(h); else addHistoryEvent(h); setEditingHistory(null); }} className="space-y-4">
-                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Año" value={editingHistory.year || ''} onChange={e => setEditingHistory({...editingHistory, year: e.target.value})} />
-                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Título" value={editingHistory.title || ''} onChange={e => setEditingHistory({...editingHistory, title: e.target.value})} />
-                        <textarea style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-24" placeholder="Descripción" value={editingHistory.description || ''} onChange={e => setEditingHistory({...editingHistory, description: e.target.value})} />
-                        <input style={{backgroundColor: 'white'}} className="w-full !bg-white p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="URL Imagen" value={editingHistory.imageUrl || ''} onChange={e => setEditingHistory({...editingHistory, imageUrl: e.target.value})} />
+                    <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200 my-8">
+                      <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{editingHistory.id ? 'Editar' : 'Nuevo'} Hito</h3>
+                      <form onSubmit={async (e) => { e.preventDefault(); const h = { ...editingHistory, id: editingHistory.id || Date.now().toString() } as HistoryEvent; const ok = await (editingHistory.id ? updateHistoryEvent(h) : addHistoryEvent(h)); if (ok) setEditingHistory(null); }} className="space-y-4">
+                        <div><label className="text-xs font-bold text-leather-700 mb-1 block">Época *</label><input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder='ej: "Los inicios" o "2024"' value={editingHistory.year || ''} onChange={e => setEditingHistory({...editingHistory, year: e.target.value})} required /></div>
+                        <div><label className="text-xs font-bold text-leather-700 mb-1 block">Título *</label><input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="ej: Herencia Familiar" value={editingHistory.title || ''} onChange={e => setEditingHistory({...editingHistory, title: e.target.value})} required /></div>
+                        <div><label className="text-xs font-bold text-leather-700 mb-1 block">Descripción</label><textarea className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-24" placeholder="Contá este capítulo de la historia" value={editingHistory.description || ''} onChange={e => setEditingHistory({...editingHistory, description: e.target.value})} /></div>
+                        <div>
+                          <label className="text-xs font-bold text-leather-700 mb-1 block">Imagen</label>
+                          <label className="flex items-center gap-2 cursor-pointer bg-leather-50 border-2 border-dashed border-leather-300 rounded-lg p-3 hover:border-leather-500 transition-colors">
+                            <Upload size={18} className="text-leather-500" /><span className="text-sm text-leather-600">Subir foto</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                              const file = e.target.files?.[0]; if (!file) return;
+                              try { const url = await StorageService.uploadImage(file, 'history'); setEditingHistory(prev => ({...prev, imageUrl: url})); } catch { alert('Error al subir la foto. Verificá tu conexión.'); }
+                              e.target.value = '';
+                            }} />
+                          </label>
+                          {editingHistory.imageUrl && <img src={processImageUrl(editingHistory.imageUrl, 100)} className="w-16 h-16 object-cover rounded mt-2" alt="" onError={handleImgError} />}
+                          <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none mt-2 text-sm" placeholder="O pegar URL de imagen" value={editingHistory.imageUrl || ''} onChange={e => setEditingHistory({...editingHistory, imageUrl: e.target.value})} />
+                        </div>
                         <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditingHistory(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
                       </form>
                     </div></div>
@@ -1190,70 +1739,117 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
   );
 };
 
-// --- Missing Pages and Components ---
+// --- Catálogo ---
+type SortOption = 'destacados' | 'precio-asc' | 'precio-desc' | 'recientes';
 
 const CatalogPage = () => {
-  const { products, currency, convertPrice, addToCart, categories } = useStore();
+  const { products, currency, convertPrice, addToCart, categories, loading } = useStore();
   const [filter, setFilter] = useState('Todas');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sort, setSort] = useState<SortOption>('destacados');
 
-  useEffect(() => { 
-    window.scrollTo(0, 0); 
-    document.title = "Tienda - MARIEL'LA";
-  }, []);
+  usePageMeta("Tienda - MARIEL'LA", 'Catálogo de artesanía en cuero: carteras, bolsos, billeteras, cintos y accesorios únicos hechos a mano en Uruguay.');
 
-  // Filter products by category AND search term (name or description)
+  // Filtrado por categoría y búsqueda (nombre o descripción)
   const filtered = products.filter(p => {
     const matchesCategory = filter === 'Todas' || p.category === filter;
-    const matchesSearch = 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      p.name.toLowerCase().includes(term) ||
+      p.description.toLowerCase().includes(term);
     return matchesCategory && matchesSearch;
+  });
+
+  const recency = (p: Product) => p.createdAt ? new Date(p.createdAt).getTime() : Number(p.id) || 0;
+  const sorted = [...filtered].sort((a, b) => {
+    // Las agotadas siempre al final
+    const soldDiff = (a.isSoldOut ? 1 : 0) - (b.isSoldOut ? 1 : 0);
+    if (soldDiff !== 0) return soldDiff;
+    switch (sort) {
+      case 'precio-asc': return a.priceUYU - b.priceUYU;
+      case 'precio-desc': return b.priceUYU - a.priceUYU;
+      case 'recientes': return recency(b) - recency(a);
+      case 'destacados':
+      default:
+        if (a.isFeatured !== b.isFeatured) return a.isFeatured ? -1 : 1;
+        return recency(b) - recency(a);
+    }
   });
 
   return (
     <div className="pt-36 pb-24 bg-leather-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4">
         <h1 className="text-4xl font-serif font-bold text-leather-900 mb-8 text-center">Nuestra Colección</h1>
-        
+
         {/* Search Input */}
         <div className="max-w-md mx-auto mb-8 relative">
-          <input 
-            type="text" 
-            placeholder="Buscar por nombre o descripción..." 
+          <input
+            type="text"
+            placeholder="Buscar por nombre o descripción..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-full border border-leather-200 focus:border-leather-900 focus:ring-2 focus:ring-leather-100 transition-all outline-none bg-white shadow-sm"
+            className="w-full pl-12 pr-10 py-3 rounded-full border border-leather-200 focus:border-leather-900 focus:ring-2 focus:ring-leather-100 transition-all outline-none shadow-sm"
+            aria-label="Buscar productos"
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-leather-400" size={20} />
           {searchTerm && (
-            <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-leather-400 hover:text-leather-600">
+            <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-leather-400 hover:text-leather-600" aria-label="Borrar búsqueda">
               <XCircle size={18} />
             </button>
           )}
         </div>
 
-        <div className="flex flex-wrap justify-center gap-4 mb-12">
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setFilter(cat)} className={`px-6 py-2 rounded-full font-bold transition-all border ${filter === cat ? 'bg-leather-900 text-white border-leather-900' : 'bg-white text-leather-900 border-leather-200 hover:border-leather-900'}`}>
-              {cat}
-            </button>
-          ))}
-        </div>
-        
-        {filtered.length > 0 ? (
+        {categories.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-3 mb-8">
+            {categories.map(cat => (
+              <button key={cat} onClick={() => setFilter(cat)} aria-pressed={filter === cat} className={`px-6 py-2 rounded-full font-bold transition-all border ${filter === cat ? 'bg-leather-900 text-white border-leather-900' : 'bg-white text-leather-900 border-leather-200 hover:border-leather-900'}`}>
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Contador + Orden */}
+        {!loading && (
+          <div className="flex justify-between items-center mb-8 max-w-7xl mx-auto flex-wrap gap-3">
+            <p className="text-leather-500 font-medium text-sm">{sorted.length} {sorted.length === 1 ? 'pieza' : 'piezas'}</p>
+            <div className="flex items-center gap-3">
+              <CurrencyToggle />
+              <select
+                value={sort}
+                onChange={e => setSort(e.target.value as SortOption)}
+                className="px-4 py-2 rounded-lg border border-leather-200 text-sm font-bold text-leather-800 focus:border-leather-900 focus:outline-none shadow-sm cursor-pointer"
+                aria-label="Ordenar productos"
+              >
+                <option value="destacados">Destacadas primero</option>
+                <option value="recientes">Más recientes</option>
+                <option value="precio-asc">Precio: menor a mayor</option>
+                <option value="precio-desc">Precio: mayor a menor</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
-            {filtered.map(product => (
+            {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+          </div>
+        ) : sorted.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
+            {sorted.map(product => (
               <div key={product.id} className={`bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all group border border-leather-100 ${product.isSoldOut ? 'opacity-75' : ''}`}>
                 <Link to={`/producto/${product.id}`} className="block relative aspect-square overflow-hidden">
-                  <img src={processImageUrl(product.images[0], 400)} className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${product.isSoldOut ? 'grayscale-[30%]' : ''}`} alt={product.name} loading="lazy" onError={handleImgError} />
+                  <img src={imgSrc(product.images, 400)} className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${product.isSoldOut ? 'grayscale-[30%]' : ''}`} alt={product.name} loading="lazy" onError={handleImgError} />
+                  {product.isFeatured && !product.isSoldOut && (
+                    <span className="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/90 backdrop-blur-sm text-leather-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm border border-leather-100"><Star size={12} className="fill-amber-400 text-amber-400" /> Destacada</span>
+                  )}
                   {product.isSoldOut && <div className="absolute inset-0 flex items-center justify-center"><span className="bg-red-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg uppercase tracking-wider">Agotado</span></div>}
                 </Link>
                 <div className="p-4">
-                  <Link to={`/producto/${product.id}`}><h3 className="font-bold text-lg text-leather-900 mb-2">{product.name}</h3></Link>
+                  <Link to={`/producto/${product.id}`}><h3 className="font-bold text-lg text-leather-900 mb-2 group-hover:text-leather-600 transition-colors">{product.name}</h3></Link>
                   <div className="flex justify-between items-center">
-                    <span className={`font-bold ${product.isSoldOut ? 'text-leather-400 line-through' : 'text-leather-600'}`}>{currency} {convertPrice(product.priceUYU).toLocaleString()}</span>
-                    {!product.isSoldOut && <button onClick={() => addToCart(product)} className="p-2 bg-leather-50 rounded-full hover:bg-leather-900 hover:text-white transition-colors border border-leather-100" aria-label="Agregar al carrito"><ShoppingBag size={18} /></button>}
+                    <span className={`font-bold ${product.isSoldOut ? 'text-leather-400 line-through' : 'text-leather-600'}`}>{formatPrice(convertPrice(product.priceUYU), currency)}</span>
+                    {!product.isSoldOut && <button onClick={() => addToCart(product)} className="p-2 bg-leather-50 rounded-full hover:bg-leather-900 hover:text-white transition-colors border border-leather-100" aria-label={`Agregar ${product.name} al carrito`}><ShoppingBag size={18} /></button>}
                   </div>
                 </div>
               </div>
@@ -1275,25 +1871,25 @@ const CatalogPage = () => {
 
 const HistoryPage = () => {
   const { history } = useStore();
-  useEffect(() => { document.title = "Historia - MARIEL'LA"; }, []);
+  usePageMeta("Nuestra Historia - MARIEL'LA", 'La trayectoria de MARIEL\'LA: de la tapicería familiar TAPIPOCITOS al taller de Piriápolis. Tradición artesanal uruguaya.');
   return (
     <div className="pt-36 pb-24 bg-[#fdfbf7] min-h-screen relative">
       <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none"></div>
       <div className="max-w-4xl mx-auto px-4 relative z-10">
         <div className="text-center mb-20">
-          <span className="text-leather-600 uppercase tracking-widest text-xs font-bold block mb-2">Desde 1998</span>
-          <h1 className="text-5xl font-serif font-bold text-leather-900">Nuestra Trayectoria</h1>
+          <span className="text-leather-600 uppercase tracking-widest text-xs font-bold block mb-2">Tradición familiar</span>
+          <h1 className="text-5xl font-serif font-bold text-leather-900">Nuestra Historia</h1>
         </div>
-        
+
         <div className="relative">
           {/* Central Line */}
           <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-0.5 bg-leather-300 hidden md:block"></div>
-          
+
           <div className="space-y-24">
             {history.map((event, i) => (
               <div key={event.id} className={`flex flex-col md:flex-row gap-12 items-center ${i % 2 !== 0 ? 'md:flex-row-reverse' : ''}`}>
                 <div className="flex-1 w-full text-center md:text-left">
-                  <div className={`flex flex-col ${i % 2 !== 0 ? 'md:items-start' : 'md:items-end'} md:text-${i % 2 !== 0 ? 'left' : 'right'}`}>
+                  <div className={`flex flex-col ${i % 2 !== 0 ? 'md:items-start md:text-left' : 'md:items-end md:text-right'}`}>
                     <div className="inline-block relative p-4 mb-4 leather-patch rounded-lg transform -rotate-2">
                        <div className="absolute inset-1 stitch-border rounded-md pointer-events-none"></div>
                        <span className="text-2xl font-bold text-stitch font-serif relative z-10">{event.year}</span>
@@ -1302,13 +1898,13 @@ const HistoryPage = () => {
                     <p className="text-leather-700 leading-relaxed font-medium text-lg">{event.description}</p>
                   </div>
                 </div>
-                
+
                 {/* Timeline Dot */}
-                <div className="hidden md:flex items-center justify-center w-6 h-6 rounded-full bg-leather-900 border-4 border-[#fdfbf7] z-10 shadow-lg"></div>
-                
+                <div className="hidden md:flex items-center justify-center w-6 h-6 rounded-full bg-leather-900 border-4 border-[#fdfbf7] z-10 shadow-lg flex-shrink-0"></div>
+
                 <div className="flex-1 w-full">
                   <div className="relative aspect-[4/3] bg-white p-3 shadow-xl transform rotate-1 hover:rotate-0 transition-transform duration-500 border border-leather-200 rounded-sm">
-                     <img src={processImageUrl(event.imageUrl, 800)} className="w-full h-full object-cover" alt={event.title} />
+                     <img src={imgSrc1(event.imageUrl, 800)} className="w-full h-full object-cover" alt={event.title} loading="lazy" onError={handleImgError} />
                   </div>
                 </div>
               </div>
@@ -1318,6 +1914,7 @@ const HistoryPage = () => {
 
         <div className="mt-24 text-center">
            <p className="text-2xl font-serif text-leather-900 italic">"La historia no termina aquí, cada pieza que entregamos escribe un nuevo capítulo."</p>
+           <Link to="/catalogo" className="inline-block mt-8 bg-leather-900 text-white px-8 py-3 rounded-lg font-bold hover:bg-leather-800 transition shadow-lg">Conocé nuestras piezas</Link>
         </div>
       </div>
     </div>
@@ -1326,15 +1923,15 @@ const HistoryPage = () => {
 
 const FairsPage = () => {
   const { fairs } = useStore();
-  const upcoming = fairs.filter(f => f.status === 'upcoming');
-  const past = fairs.filter(f => f.status === 'past');
-  useEffect(() => { document.title = "Ferias - MARIEL'LA"; }, []);
+  const upcoming = fairs.filter(f => f.status === 'upcoming').sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
+  const past = fairs.filter(f => f.status === 'past').sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime());
+  usePageMeta("Ferias - MARIEL'LA", 'Encontranos en las próximas ferias artesanales de Uruguay. Calendario de eventos de MARIEL\'LA.');
 
   return (
     <div className="pt-36 pb-24 bg-white min-h-screen">
       <div className="max-w-5xl mx-auto px-4">
         <h1 className="text-4xl font-serif font-bold text-leather-900 mb-12 text-center">Encuentros y Ferias</h1>
-        
+
         {upcoming.length > 0 && (
           <div className="mb-16">
             <h2 className="text-2xl font-bold text-leather-900 mb-8 border-b border-leather-100 pb-2">Próximas Fechas</h2>
@@ -1342,12 +1939,18 @@ const FairsPage = () => {
               {upcoming.map(fair => (
                 <div key={fair.id} className="bg-leather-50 p-8 rounded-xl flex flex-col md:flex-row gap-8 items-center border border-leather-100 hover:shadow-lg transition">
                   <div className="text-center md:text-left min-w-[100px]">
-                    <div className="text-3xl font-bold text-leather-900">{new Date(fair.date).getDate()}</div>
-                    <div className="text-sm uppercase font-bold text-leather-500">{new Date(fair.date).toLocaleString('es-ES', { month: 'long' })}</div>
+                    <div className="text-3xl font-bold text-leather-900">{parseLocalDate(fair.date).getDate()}</div>
+                    <div className="text-sm uppercase font-bold text-leather-500">{parseLocalDate(fair.date).toLocaleString('es-UY', { month: 'long' })}</div>
+                    <div className="text-xs font-bold text-leather-400">{parseLocalDate(fair.date).getFullYear()}</div>
                   </div>
+                  {fair.imageUrl && (
+                    <div className="w-full md:w-36 aspect-video md:aspect-square rounded-lg overflow-hidden border border-leather-200 flex-shrink-0">
+                      <img src={processImageUrl(fair.imageUrl, 300)} alt={fair.name} className="w-full h-full object-cover" loading="lazy" onError={handleImgError} />
+                    </div>
+                  )}
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-leather-900 mb-2">{fair.name}</h3>
-                    <p className="text-leather-600 mb-2 flex items-center gap-2 font-medium"><MapPin size={16} /> {fair.city} - {fair.location}</p>
+                    <p className="text-leather-600 mb-2 flex items-center gap-2 font-medium"><MapPin size={16} /> {fair.city}{fair.location ? ` — ${fair.location}` : ''}</p>
                     <p className="text-sm text-leather-700">{fair.description}</p>
                   </div>
                   {fair.mapsUrl && <a href={fair.mapsUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-2 border border-leather-900 text-leather-900 rounded-full font-bold hover:bg-leather-900 hover:text-white transition">Ver Mapa</a>}
@@ -1357,16 +1960,37 @@ const FairsPage = () => {
           </div>
         )}
 
-        <div>
-          <h2 className="text-2xl font-bold text-leather-900 mb-8 border-b border-leather-100 pb-2">Eventos Pasados</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {past.map(fair => (
-              <div key={fair.id} className="bg-white border border-leather-200 p-6 rounded-xl opacity-75 hover:opacity-100 transition hover:shadow-md">
-                <h3 className="font-bold text-leather-900 text-lg">{fair.name}</h3>
-                <p className="text-sm text-leather-500 mb-3 font-bold uppercase">{new Date(fair.date).getFullYear()} • {fair.city}</p>
-                <p className="text-sm text-leather-600 line-clamp-2">{fair.description}</p>
-              </div>
-            ))}
+        {upcoming.length === 0 && (
+          <div className="mb-16 bg-leather-50 p-10 rounded-xl border border-dashed border-leather-200 text-center">
+            <Calendar size={40} className="mx-auto text-leather-300 mb-4" />
+            <p className="text-leather-600 font-medium text-lg mb-1">No tenemos fechas confirmadas por el momento</p>
+            <p className="text-leather-400 text-sm">Seguinos en Instagram para enterarte de la próxima feria</p>
+          </div>
+        )}
+
+        {past.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-bold text-leather-900 mb-8 border-b border-leather-100 pb-2">Eventos Pasados</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {past.map(fair => (
+                <div key={fair.id} className="bg-white border border-leather-200 p-6 rounded-xl opacity-75 hover:opacity-100 transition hover:shadow-md">
+                  <h3 className="font-bold text-leather-900 text-lg">{fair.name}</h3>
+                  <p className="text-sm text-leather-500 mb-3 font-bold uppercase">{parseLocalDate(fair.date).getFullYear()} • {fair.city}</p>
+                  <p className="text-sm text-leather-600 line-clamp-2">{fair.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-20 bg-leather-900 rounded-2xl p-10 text-center relative overflow-hidden">
+          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-[size:12px_12px]"></div>
+          <div className="relative z-10">
+            <h3 className="text-2xl font-serif font-bold text-leather-50 mb-3">¿Organizás una feria artesanal?</h3>
+            <p className="text-leather-200 font-medium mb-6">Nos encanta llevar nuestras piezas por todo el país. ¡Invitanos!</p>
+            <a href={waLink('¡Hola MARIEL\'LA! Los quiero invitar a una feria 🎪')} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-[#25D366] text-white px-8 py-3 rounded-full font-bold hover:bg-[#20bd5a] transition-all shadow-lg">
+              <MessageCircle size={20} className="fill-white" /> Escribinos
+            </a>
           </div>
         </div>
       </div>
@@ -1376,14 +2000,26 @@ const FairsPage = () => {
 
 const LoginPage = () => {
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
-  const { login } = useStore();
+  const [submitting, setSubmitting] = useState(false);
+  const { login, isAdmin } = useStore();
   const navigate = useNavigate();
-  useEffect(() => { document.title = "Acceso Admin - MARIEL'LA"; }, []);
+  usePageMeta("Acceso Admin - MARIEL'LA");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Si ya hay sesión, directo al panel
+  useEffect(() => {
+    if (isAdmin) navigate('/admin', { replace: true });
+  }, [isAdmin, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(password)) {
+    if (submitting || !password) return;
+    setSubmitting(true);
+    setError(false);
+    const ok = await login(password);
+    setSubmitting(false);
+    if (ok) {
       navigate('/admin');
     } else {
       setError(true);
@@ -1393,51 +2029,91 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen bg-leather-50 flex items-center justify-center p-4">
       <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full border border-leather-100">
-        <h1 className="text-2xl font-bold text-center mb-6 text-leather-900">Acceso Admin</h1>
-        <input 
-          style={{backgroundColor: 'white'}}
-          type="password" 
-          value={password} 
-          onChange={e => { setPassword(e.target.value); setError(false); }} 
-          className="w-full !bg-white p-3 rounded-lg mb-4 focus:ring-2 focus:ring-leather-500 focus:outline-none border border-gray-300 text-leather-900"
-          placeholder="Contraseña"
-        />
-        {error && <p className="text-red-500 text-sm mb-4 text-center font-bold">Contraseña incorrecta</p>}
-        <button type="submit" className="w-full bg-leather-900 text-white py-3 rounded-lg font-bold hover:bg-leather-800 transition">Ingresar</button>
+        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-leather-900 flex items-center justify-center">
+          <span className="font-serif font-bold text-leather-100 text-xl">M'L</span>
+        </div>
+        <h1 className="text-2xl font-bold text-center mb-1 text-leather-900">Acceso Admin</h1>
+        <p className="text-center text-leather-400 text-sm mb-6 font-medium">Espacio de Mariela 💛</p>
+        <div className="relative mb-4">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError(false); }}
+            className="w-full p-3 pr-12 rounded-lg focus:ring-2 focus:ring-leather-500 focus:outline-none border border-gray-300"
+            placeholder="Contraseña"
+            autoFocus
+            aria-label="Contraseña"
+          />
+          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-leather-400 hover:text-leather-700" aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        </div>
+        {error && <p className="text-red-500 text-sm mb-4 text-center font-bold">Contraseña incorrecta. Probá de nuevo.</p>}
+        <button type="submit" disabled={submitting || !password} className="w-full bg-leather-900 text-white py-3 rounded-lg font-bold hover:bg-leather-800 transition disabled:opacity-60">
+          {submitting ? 'Ingresando...' : 'Ingresar'}
+        </button>
       </form>
     </div>
   );
+};
+
+// --- Guard de ruta admin ---
+const RequireAdmin = ({ children }: { children: ReactNode }) => {
+  const { isAdmin, authReady } = useStore();
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-leather-50">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-leather-200 border-t-leather-900 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-leather-500 font-medium">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+  if (!isAdmin) return <Navigate to="/login" replace />;
+  return <>{children}</>;
 };
 
 const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const { cart, removeFromCart, updateCartQuantity, currency, setCurrency, convertPrice } = useStore();
   const total = cart.reduce((sum, item) => sum + convertPrice(item.priceUYU) * item.quantity, 0);
 
+  // ESC para cerrar + bloquear scroll del fondo
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handler);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, onClose]);
+
   const handleCheckout = () => {
     if (cart.length === 0) return;
-    let message = "Hola MARIEL'LA, me gustaría realizar el siguiente pedido:\n\n";
+    let message = "¡Hola MARIEL'LA! 👋 Quiero hacer este pedido:\n\n";
     cart.forEach(item => {
-      message += `• ${item.quantity}x ${item.name} (${currency} ${convertPrice(item.priceUYU)})\n`;
+      message += `• ${item.quantity}x ${item.name} — ${formatPrice(convertPrice(item.priceUYU), currency)}\n  ${window.location.origin}/producto/${item.id}\n`;
     });
-    message += `\nTotal: ${currency} ${total}`;
-    const whatsappUrl = `https://wa.me/59898766318?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    message += `\nTotal: ${formatPrice(total, currency)}\n\n¿Cómo coordinamos el pago y el envío?`;
+    window.open(waLink(message), '_blank');
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60]">
+    <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label="Carrito de compras">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl p-6 flex flex-col animate-slide-in-right">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-serif font-bold text-leather-900">Tu Carrito</h2>
-          <button onClick={onClose} className="p-2 hover:bg-leather-50 rounded-full text-leather-900"><X /></button>
+          <button onClick={onClose} className="p-2 hover:bg-leather-50 rounded-full text-leather-900" aria-label="Cerrar carrito"><X /></button>
         </div>
         {/* Currency Toggle */}
         <div className="flex items-center gap-2 mb-6 bg-leather-50 rounded-lg p-1 self-start border border-leather-100">
-          <button onClick={() => setCurrency('UYU')} className={`px-3 py-1 rounded-md text-sm font-bold transition-all ${currency === 'UYU' ? 'bg-leather-900 text-white shadow-sm' : 'text-leather-600 hover:text-leather-900'}`}>UYU</button>
-          <button onClick={() => setCurrency('USD')} className={`px-3 py-1 rounded-md text-sm font-bold transition-all ${currency === 'USD' ? 'bg-leather-900 text-white shadow-sm' : 'text-leather-600 hover:text-leather-900'}`}>USD</button>
+          <button onClick={() => setCurrency('UYU')} aria-pressed={currency === 'UYU'} className={`px-3 py-1 rounded-md text-sm font-bold transition-all ${currency === 'UYU' ? 'bg-leather-900 text-white shadow-sm' : 'text-leather-600 hover:text-leather-900'}`}>UYU</button>
+          <button onClick={() => setCurrency('USD')} aria-pressed={currency === 'USD'} className={`px-3 py-1 rounded-md text-sm font-bold transition-all ${currency === 'USD' ? 'bg-leather-900 text-white shadow-sm' : 'text-leather-600 hover:text-leather-900'}`}>USD</button>
         </div>
         <div className="flex-1 overflow-y-auto space-y-4">
           {cart.length === 0 ? (
@@ -1448,17 +2124,17 @@ const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
             </div>
           ) : cart.map(item => (
             <div key={item.id} className="flex gap-4 border-b border-leather-100 pb-4">
-              <img src={processImageUrl(item.images[0], 100)} className="w-20 h-20 object-cover rounded-lg border border-leather-100" alt={item.name} />
+              <img src={imgSrc(item.images, 100)} className="w-20 h-20 object-cover rounded-lg border border-leather-100" alt={item.name} onError={handleImgError} />
               <div className="flex-1">
                 <h3 className="font-bold text-leather-900 text-sm leading-tight">{item.name}</h3>
-                <p className="text-leather-600 font-bold mt-1">{currency} {convertPrice(item.priceUYU).toLocaleString()}</p>
+                <p className="text-leather-600 font-bold mt-1">{formatPrice(convertPrice(item.priceUYU), currency)}</p>
                 <div className="flex items-center gap-3 mt-2">
-                  <button onClick={() => updateCartQuantity(item.id, -1)} className="w-7 h-7 flex items-center justify-center bg-leather-100 rounded-full hover:bg-leather-200 text-leather-800 transition"><Minus size={14} /></button>
+                  <button onClick={() => updateCartQuantity(item.id, -1)} className="w-7 h-7 flex items-center justify-center bg-leather-100 rounded-full hover:bg-leather-200 text-leather-800 transition" aria-label="Restar uno"><Minus size={14} /></button>
                   <span className="font-bold text-leather-900 min-w-[20px] text-center">{item.quantity}</span>
-                  <button onClick={() => updateCartQuantity(item.id, 1)} className="w-7 h-7 flex items-center justify-center bg-leather-100 rounded-full hover:bg-leather-200 text-leather-800 transition"><Plus size={14} /></button>
+                  <button onClick={() => updateCartQuantity(item.id, 1)} className="w-7 h-7 flex items-center justify-center bg-leather-100 rounded-full hover:bg-leather-200 text-leather-800 transition" aria-label="Sumar uno"><Plus size={14} /></button>
                 </div>
               </div>
-              <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 self-start p-1 transition"><Trash2 size={18} /></button>
+              <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 self-start p-1 transition" aria-label={`Quitar ${item.name} del carrito`}><Trash2 size={18} /></button>
             </div>
           ))}
         </div>
@@ -1466,9 +2142,9 @@ const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
           <div className="border-t border-leather-200 pt-6 mt-4">
             <div className="flex justify-between text-xl font-bold text-leather-900 mb-2">
               <span>Total</span>
-              <span>{currency} {total.toLocaleString()}</span>
+              <span>{formatPrice(total, currency)}</span>
             </div>
-            <p className="text-xs text-leather-500 mb-6 flex items-center gap-1"><Truck size={14} /> Envíos a todo Uruguay</p>
+            <p className="text-xs text-leather-500 mb-6 flex items-center gap-1"><Truck size={14} /> Envíos a todo Uruguay — el pedido se confirma por WhatsApp</p>
             <button onClick={handleCheckout} className="w-full bg-[#25D366] text-white py-4 rounded-xl font-bold hover:bg-[#128C7E] transition shadow-lg flex items-center justify-center gap-2 active:scale-95 transform">
               <MessageCircle size={24} className="fill-white" /> Finalizar en WhatsApp
             </button>
@@ -1486,8 +2162,8 @@ const Footer = () => (
         <h3 className="text-white font-serif font-bold text-2xl mb-4">MARIEL'LA</h3>
         <p className="text-sm font-medium leading-relaxed mb-4">Artesanía en cuero con identidad uruguaya. Cada pieza cuenta una historia de tradición y pasión.</p>
         <div className="flex gap-4 mt-4">
-          <a href="https://www.instagram.com/mariellacalistro/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-leather-800 flex items-center justify-center hover:bg-leather-700 transition-colors"><Instagram size={18} className="text-leather-200" /></a>
-          <a href="https://wa.me/59898766318" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-leather-800 flex items-center justify-center hover:bg-[#25D366] transition-colors"><MessageCircle size={18} className="text-leather-200" /></a>
+          <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-leather-800 flex items-center justify-center hover:bg-leather-700 transition-colors" aria-label="Instagram"><Instagram size={18} className="text-leather-200" /></a>
+          <a href={waLink()} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-leather-800 flex items-center justify-center hover:bg-[#25D366] transition-colors" aria-label="WhatsApp"><MessageCircle size={18} className="text-leather-200" /></a>
         </div>
       </div>
       <div>
@@ -1495,6 +2171,7 @@ const Footer = () => (
         <ul className="space-y-3 text-sm font-medium">
           <li><Link to="/catalogo" className="hover:text-white transition-colors">Colección</Link></li>
           <li><Link to="/nosotros" className="hover:text-white transition-colors">Conoce a Mariela</Link></li>
+          <li><Link to="/historia" className="hover:text-white transition-colors">Nuestra Historia</Link></li>
           <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
           <li><Link to="/ferias" className="hover:text-white transition-colors">Ferias</Link></li>
         </ul>
@@ -1502,8 +2179,8 @@ const Footer = () => (
       <div>
         <h4 className="text-white font-bold mb-4 text-sm uppercase tracking-wider">Contacto</h4>
         <ul className="space-y-3 text-sm font-medium">
-          <li className="flex items-center gap-2"><Phone size={14} /> +598 98 766 318</li>
-          <li className="flex items-center gap-2"><MapPin size={14} /> Montevideo, Uruguay</li>
+          <li><a href={waLink()} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-white transition-colors"><Phone size={14} /> +598 98 766 318</a></li>
+          <li className="flex items-center gap-2"><MapPin size={14} /> Piriápolis, Maldonado — Uruguay</li>
         </ul>
       </div>
       <div>
@@ -1517,14 +2194,14 @@ const Footer = () => (
     </div>
     <div className="max-w-7xl mx-auto px-4 mt-12 pt-8 border-t border-leather-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-medium">
       <p>&copy; {new Date().getFullYear()} MARIEL'LA. Todos los derechos reservados.</p>
-      <p className="text-leather-500">Artesanía en cuero uruguaya desde 1998</p>
+      <p className="text-leather-500">Tradición artesanal familiar — hecho con <Heart size={10} className="inline text-red-400 fill-current" /> en Uruguay</p>
     </div>
   </footer>
 );
 
 // --- 404 Page ---
 const NotFoundPage = () => {
-  useEffect(() => { document.title = "Página no encontrada - MARIEL'LA"; }, []);
+  usePageMeta("Página no encontrada - MARIEL'LA");
   return (
     <div className="min-h-screen flex items-center justify-center bg-leather-50 pt-20">
       <div className="text-center px-4 max-w-lg">
@@ -1571,30 +2248,33 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <StoreProvider>
-        <HashRouter>
-          <GlobalStyles />
-          <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-          <Navbar toggleCart={toggleCart} />
-          <FloatingWhatsApp />
-          <main>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/catalogo" element={<CatalogPage />} />
-              <Route path="/nosotros" element={<AboutPage />} />
-            <Route path="/historia" element={<HistoryPage />} />
-              <Route path="/blog" element={<BlogPage />} />
-              <Route path="/blog/:id" element={<BlogPage />} />
-              <Route path="/ferias" element={<FairsPage />} />
-              <Route path="/producto/:id" element={<ProductDetail />} />
-              <Route path="/admin" element={<AdminPanel />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </main>
-          <Footer />
-        </HashRouter>
-      </StoreProvider>
+      <ToastProvider>
+        <StoreProvider>
+          <BrowserRouter>
+            <HashRedirect />
+            <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+            <Navbar toggleCart={toggleCart} />
+            <FloatingWhatsApp />
+            <ScrollTopButton />
+            <main>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/catalogo" element={<CatalogPage />} />
+                <Route path="/nosotros" element={<AboutPage />} />
+                <Route path="/historia" element={<HistoryPage />} />
+                <Route path="/blog" element={<BlogPage />} />
+                <Route path="/blog/:id" element={<BlogPage />} />
+                <Route path="/ferias" element={<FairsPage />} />
+                <Route path="/producto/:id" element={<ProductDetail />} />
+                <Route path="/admin" element={<RequireAdmin><AdminPanel /></RequireAdmin>} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </main>
+            <Footer />
+          </BrowserRouter>
+        </StoreProvider>
+      </ToastProvider>
     </ErrorBoundary>
   );
 };
