@@ -8,17 +8,19 @@ export default {
         sans: ['Lato', 'sans-serif'],
       },
       colors: {
+        // La paleta "leather" se resuelve por variables CSS para poder cambiar
+        // el tema del sitio en runtime (ver :root y [data-theme=...] en index.css)
         leather: {
-          50: '#fbf7f0', // Cream background
-          100: '#f5ead6',
-          200: '#ebd4ac',
-          300: '#dfba7e',
-          400: '#d09b52',
-          500: '#c68131', // Base leather
-          600: '#ba6626', // Accent
-          700: '#9b4d23', // Secondary
-          800: '#7f3e23',
-          900: '#67331e', // Primary Text
+          50: 'rgb(var(--leather-50) / <alpha-value>)',
+          100: 'rgb(var(--leather-100) / <alpha-value>)',
+          200: 'rgb(var(--leather-200) / <alpha-value>)',
+          300: 'rgb(var(--leather-300) / <alpha-value>)',
+          400: 'rgb(var(--leather-400) / <alpha-value>)',
+          500: 'rgb(var(--leather-500) / <alpha-value>)',
+          600: 'rgb(var(--leather-600) / <alpha-value>)',
+          700: 'rgb(var(--leather-700) / <alpha-value>)',
+          800: 'rgb(var(--leather-800) / <alpha-value>)',
+          900: 'rgb(var(--leather-900) / <alpha-value>)',
         },
       },
     },

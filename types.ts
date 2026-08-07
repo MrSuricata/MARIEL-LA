@@ -63,3 +63,13 @@ export interface Order {
 }
 
 export type Currency = 'UYU' | 'USD';
+
+export type ThemeName = 'cuero' | 'vino' | 'oliva' | 'noche' | 'terracota' | 'rosa';
+
+export interface SiteSettings {
+  theme: ThemeName;
+  heroEyebrow: string;
+  heroLine1: string;
+  heroLine2: string;
+  heroCta: string;
+}

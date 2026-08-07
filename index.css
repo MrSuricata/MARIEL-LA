@@ -2,9 +2,102 @@
 @tailwind components;
 @tailwind utilities;
 
-/* El sitio es solo claro: evita que navegadores en modo oscuro fuercen controles oscuros */
+/* ============================================================
+   TEMAS — la paleta "leather" de Tailwind lee estas variables.
+   El tema se elige desde Admin → Personalizar y se aplica con
+   data-theme en <html>. "cuero" es el tema por defecto (:root).
+   Formato: R G B (para soportar opacidades tipo bg-leather-900/40)
+   ============================================================ */
 :root {
+  --leather-50: 251 247 240;
+  --leather-100: 245 234 214;
+  --leather-200: 235 212 172;
+  --leather-300: 223 186 126;
+  --leather-400: 208 155 82;
+  --leather-500: 198 129 49;
+  --leather-600: 186 102 38;
+  --leather-700: 155 77 35;
+  --leather-800: 127 62 35;
+  --leather-900: 103 51 30;
+  --paper: 253 251 247;      /* fondo tenue de secciones */
+  --dot: 205 133 63;         /* herrajes (remaches) */
+  --dot-border: 93 47 13;
   color-scheme: light;
+}
+
+[data-theme='vino'] {
+  --leather-50: 253 246 245;
+  --leather-100: 248 232 230;
+  --leather-200: 239 208 204;
+  --leather-300: 224 171 164;
+  --leather-400: 203 127 118;
+  --leather-500: 178 90 80;
+  --leather-600: 156 64 56;
+  --leather-700: 126 48 44;
+  --leather-800: 99 37 35;
+  --leather-900: 74 26 25;
+  --paper: 253 250 249;
+  --dot-border: 74 26 25;
+}
+
+[data-theme='oliva'] {
+  --leather-50: 249 249 242;
+  --leather-100: 240 239 221;
+  --leather-200: 224 223 192;
+  --leather-300: 200 197 149;
+  --leather-400: 168 164 104;
+  --leather-500: 138 135 73;
+  --leather-600: 110 108 55;
+  --leather-700: 87 86 45;
+  --leather-800: 69 69 37;
+  --leather-900: 52 53 29;
+  --paper: 251 251 246;
+  --dot-border: 52 53 29;
+}
+
+[data-theme='noche'] {
+  --leather-50: 245 247 250;
+  --leather-100: 233 237 244;
+  --leather-200: 208 217 230;
+  --leather-300: 169 186 208;
+  --leather-400: 123 147 178;
+  --leather-500: 88 114 147;
+  --leather-600: 66 90 120;
+  --leather-700: 53 72 98;
+  --leather-800: 43 57 77;
+  --leather-900: 31 41 55;
+  --paper: 248 250 252;
+  --dot-border: 31 41 55;
+}
+
+[data-theme='terracota'] {
+  --leather-50: 253 247 243;
+  --leather-100: 250 233 223;
+  --leather-200: 243 210 191;
+  --leather-300: 233 174 144;
+  --leather-400: 218 133 96;
+  --leather-500: 199 100 64;
+  --leather-600: 173 77 46;
+  --leather-700: 140 61 39;
+  --leather-800: 112 50 33;
+  --leather-900: 85 38 26;
+  --paper: 253 250 247;
+  --dot-border: 85 38 26;
+}
+
+[data-theme='rosa'] {
+  --leather-50: 253 246 247;
+  --leather-100: 249 232 234;
+  --leather-200: 240 207 213;
+  --leather-300: 226 168 179;
+  --leather-400: 205 124 140;
+  --leather-500: 180 86 105;
+  --leather-600: 152 62 83;
+  --leather-700: 122 48 68;
+  --leather-800: 96 39 55;
+  --leather-900: 72 29 41;
+  --paper: 253 249 250;
+  --dot-border: 72 29 41;
 }
 
 html {
@@ -47,8 +140,8 @@ html {
 .delay-300 { animation-delay: 450ms; }
 
 .skeleton {
-  background-color: #f0e6d4;
-  background-image: linear-gradient(90deg, #f0e6d4 0px, #f7f0e3 200px, #f0e6d4 400px);
+  background-color: rgb(var(--leather-100));
+  background-image: linear-gradient(90deg, rgb(var(--leather-100)) 0px, rgb(var(--leather-50)) 200px, rgb(var(--leather-100)) 400px);
   background-size: 800px 100%;
   animation: shimmer 1.4s linear infinite;
 }
@@ -57,15 +150,15 @@ html {
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
 .leather-patch {
-  background-color: #7f3e23;
+  background-color: rgb(var(--leather-800));
   box-shadow: 0 10px 20px rgba(0,0,0,0.4), inset 0 0 40px rgba(0,0,0,0.2);
 }
 .stitch-border {
-  border: 3px dashed #f5ead6;
+  border: 3px dashed rgb(var(--leather-100));
   box-shadow: inset 0 0 2px 1px rgba(0,0,0,0.3), 0 0 1px 0 rgba(255,255,255,0.2);
 }
 .text-stitch {
-  color: #f5ead6;
+  color: rgb(var(--leather-100));
   text-shadow: 0px 1px 1px rgba(0,0,0,0.5), 0px 2px 4px rgba(0,0,0,0.3);
   filter: drop-shadow(0 2px 1px rgba(0,0,0,0.2));
 }
@@ -93,7 +186,7 @@ select:-webkit-autofill {
 
 /* Accesibilidad: foco visible con la paleta de la marca */
 :focus-visible {
-  outline: 2px solid #9b4d23;
+  outline: 2px solid rgb(var(--leather-700));
   outline-offset: 2px;
 }
 

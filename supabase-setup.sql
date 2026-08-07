@@ -65,6 +65,19 @@ CREATE TABLE IF NOT EXISTS public.mariella_categories (
   sort_order int NOT NULL DEFAULT 0
 );
 
+-- Personalización del sitio (fila única): tema de color + textos de portada
+-- (migración `mariella_settings`, 2026-08-07)
+CREATE TABLE IF NOT EXISTS public.mariella_settings (
+  id int PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  theme text NOT NULL DEFAULT 'cuero',
+  hero_eyebrow text NOT NULL DEFAULT 'Artesanía Uruguaya',
+  hero_line1 text NOT NULL DEFAULT 'Piezas de cuero genuino que cuentan historias.',
+  hero_line2 text NOT NULL DEFAULT 'Hechas a mano, una a una, con pasión y tiempo.',
+  hero_cta text NOT NULL DEFAULT 'Ver Tienda Online',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO public.mariella_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
 -- 2. ADMIN: el panel escribe con el usuario de Supabase Auth
 --    admin@mariel-la.vercel.app (independiente del admin de Volea)
 CREATE TABLE IF NOT EXISTS public.mariella_admins (
@@ -102,6 +115,9 @@ CREATE POLICY "mariella_public_read" ON public.mariella_blog_posts FOR SELECT US
 CREATE POLICY "mariella_admin_write" ON public.mariella_blog_posts FOR ALL USING (public.mariella_is_admin()) WITH CHECK (public.mariella_is_admin());
 CREATE POLICY "mariella_public_read" ON public.mariella_categories FOR SELECT USING (true);
 CREATE POLICY "mariella_admin_write" ON public.mariella_categories FOR ALL USING (public.mariella_is_admin()) WITH CHECK (public.mariella_is_admin());
+ALTER TABLE public.mariella_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "mariella_public_read" ON public.mariella_settings FOR SELECT USING (true);
+CREATE POLICY "mariella_admin_write" ON public.mariella_settings FOR ALL USING (public.mariella_is_admin()) WITH CHECK (public.mariella_is_admin());
 CREATE POLICY "mariella_admins_self_read" ON public.mariella_admins FOR SELECT TO authenticated
   USING (lower(email) = lower(coalesce((auth.jwt() ->> 'email')::text, '')));
 

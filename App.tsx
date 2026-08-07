@@ -5,10 +5,20 @@ import {
   Star, Trash2, Edit, Plus, Minus, Search, Settings, LogOut,
   CheckCircle, ArrowRight, Hammer, Heart, ScrollText, ChevronLeft, ChevronRight,
   Maximize2, Truck, MessageCircle, Copy, Database, XCircle, Upload,
-  AlertCircle, HelpCircle, Share2, ArrowUp, Eye, EyeOff, Sparkles, Package, Calendar, Info
+  AlertCircle, HelpCircle, Share2, ArrowUp, Eye, EyeOff, Sparkles, Package, Calendar, Info, Palette
 } from 'lucide-react';
-import { Product, CartItem, Fair, Currency, HistoryEvent, BlogPost } from './types';
-import { StorageService, AuthService } from './services/storageService';
+import { Product, CartItem, Fair, Currency, HistoryEvent, BlogPost, SiteSettings, ThemeName } from './types';
+import { StorageService, AuthService, DEFAULT_SETTINGS } from './services/storageService';
+
+// Temas disponibles en Admin → Personalizar (los colores son solo la muestra del selector)
+const THEMES: { id: ThemeName; name: string; swatch: [string, string, string] }[] = [
+  { id: 'cuero', name: 'Cuero Clásico', swatch: ['#67331e', '#c68131', '#f5ead6'] },
+  { id: 'vino', name: 'Vino Bordó', swatch: ['#4a1a19', '#b25a50', '#f8e8e6'] },
+  { id: 'oliva', name: 'Verde Oliva', swatch: ['#34351d', '#8a8749', '#f0efdd'] },
+  { id: 'noche', name: 'Azul Noche', swatch: ['#1f2937', '#587293', '#e9edf4'] },
+  { id: 'terracota', name: 'Terracota', swatch: ['#55261a', '#c76440', '#fae9df'] },
+  { id: 'rosa', name: 'Rosa Viejo', swatch: ['#481d29', '#b45669', '#f9e8ea'] },
+];
 
 // --- Constantes globales ---
 const WHATSAPP_NUMBER = '59898766318';
@@ -201,6 +211,8 @@ interface StoreContextType {
   exchangeRate: number;
   loading: boolean;
   authReady: boolean;
+  settings: SiteSettings;
+  updateSettings: (s: SiteSettings) => Promise<boolean>;
   convertPrice: (priceUYU: number) => number;
   isAdmin: boolean;
   login: (password: string) => Promise<boolean>;
@@ -245,6 +257,7 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [authReady, setAuthReady] = useState<boolean>(false);
+  const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
   const { showToast } = useToast();
 
   const convertPrice = (priceUYU: number): number => {
@@ -254,18 +267,20 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     const loadData = async () => {
-      const [prods, frs, hist, blogs, cats] = await Promise.all([
+      const [prods, frs, hist, blogs, cats, setts] = await Promise.all([
         StorageService.getProducts(),
         StorageService.getFairs(),
         StorageService.getHistory(),
         StorageService.getBlogPosts(),
         StorageService.getCategories(),
+        StorageService.getSettings(),
       ]);
       setProducts(prods);
       setFairs(frs);
       setHistory(hist);
       setBlogPosts(blogs);
       setCategories(cats);
+      setSettings(setts);
       setLoading(false);
     };
     loadData();
@@ -296,6 +311,20 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     });
     return unsubscribe;
   }, []);
+
+  // Aplica el tema elegido a todo el sitio (y lo cachea para evitar parpadeo)
+  useEffect(() => {
+    if (settings.theme === 'cuero') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', settings.theme);
+    }
+    try { localStorage.setItem('mariella_theme', settings.theme); } catch { /* sin storage */ }
+    // Color de la barra del navegador acorde al tema
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const rgb = getComputedStyle(document.documentElement).getPropertyValue('--leather-900').trim();
+    if (meta && rgb) meta.setAttribute('content', `rgb(${rgb.split(' ').join(', ')})`);
+  }, [settings.theme]);
 
   useEffect(() => { localStorage.setItem('mariella_cart', JSON.stringify(cart)); }, [cart]);
 
@@ -402,6 +431,12 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     return persist(() => StorageService.deleteBlogPost(id), () => setBlogPosts(prev), 'Post eliminado');
   };
 
+  const updateSettings = (s: SiteSettings) => {
+    const prev = settings;
+    setSettings(s);
+    return persist(() => StorageService.saveSettings(s), () => setSettings(prev), 'Personalización guardada ✓');
+  };
+
   const addCategory = (c: string) => {
     if (categories.includes(c)) return Promise.resolve(false);
     const prev = categories;
@@ -416,7 +451,7 @@ const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   return (
     <StoreContext.Provider value={{
-      products, cart, fairs, history, blogPosts, categories, currency, exchangeRate, loading, authReady, convertPrice, isAdmin,
+      products, cart, fairs, history, blogPosts, categories, currency, exchangeRate, loading, authReady, settings, updateSettings, convertPrice, isAdmin,
       setCurrency, addToCart, removeFromCart, updateCartQuantity, clearCart, login, logout,
       addProduct, updateProduct, deleteProduct, addFair, updateFair, deleteFair,
       addHistoryEvent, updateHistoryEvent, deleteHistoryEvent, addBlogPost, updateBlogPost, deleteBlogPost,
@@ -617,7 +652,9 @@ const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
 
 // --- Home Sections ---
 
-const HeroSection = () => (
+const HeroSection = () => {
+  const { settings } = useStore();
+  return (
   <section id="inicio" className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden bg-leather-900">
     <div className="absolute inset-0 z-0">
       <img src="/fotos/hero-cuero.jpg" alt="Textura cuero" fetchPriority="high" className="absolute inset-0 w-full h-full object-cover blur-[2px]" onError={handleImgError} />
@@ -626,24 +663,25 @@ const HeroSection = () => (
       <div className="absolute inset-0 z-20 opacity-10 mix-blend-overlay" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)'}} />
     </div>
     <div className="relative z-30 text-center px-4 max-w-4xl mx-auto">
-      <span className="block text-leather-100 text-sm md:text-base tracking-[0.3em] uppercase mb-10 font-bold animate-fade-in-up drop-shadow-md text-shadow-sm">Artesanía Uruguaya</span>
+      <span className="block text-leather-100 text-sm md:text-base tracking-[0.3em] uppercase mb-10 font-bold animate-fade-in-up drop-shadow-md text-shadow-sm">{settings.heroEyebrow}</span>
       <div className="inline-block relative p-8 md:p-12 mb-10 animate-zoom-fade-in leather-patch rounded-lg transform rotate-1">
         <div className="absolute inset-2 stitch-border rounded-md pointer-events-none"></div>
-        <div className="absolute top-3 left-3 w-3 h-3 rounded-full bg-[#cd853f] border border-[#5d2f0d] shadow-sm z-20"></div>
-        <div className="absolute top-3 right-3 w-3 h-3 rounded-full bg-[#cd853f] border border-[#5d2f0d] shadow-sm z-20"></div>
-        <div className="absolute bottom-3 left-3 w-3 h-3 rounded-full bg-[#cd853f] border border-[#5d2f0d] shadow-sm z-20"></div>
-        <div className="absolute bottom-3 right-3 w-3 h-3 rounded-full bg-[#cd853f] border border-[#5d2f0d] shadow-sm z-20"></div>
+        <div className="absolute top-3 left-3 w-3 h-3 rounded-full bg-[rgb(var(--dot))] border border-[rgb(var(--dot-border))] shadow-sm z-20"></div>
+        <div className="absolute top-3 right-3 w-3 h-3 rounded-full bg-[rgb(var(--dot))] border border-[rgb(var(--dot-border))] shadow-sm z-20"></div>
+        <div className="absolute bottom-3 left-3 w-3 h-3 rounded-full bg-[rgb(var(--dot))] border border-[rgb(var(--dot-border))] shadow-sm z-20"></div>
+        <div className="absolute bottom-3 right-3 w-3 h-3 rounded-full bg-[rgb(var(--dot))] border border-[rgb(var(--dot-border))] shadow-sm z-20"></div>
         <h1 className="text-stitch text-5xl md:text-7xl lg:text-9xl font-serif font-bold leading-none tracking-tight relative z-10">MARIEL'LA</h1>
       </div>
       <p className="text-lg md:text-2xl text-leather-50 mb-10 max-w-2xl mx-auto font-light leading-relaxed animate-fade-in-up delay-200 drop-shadow-md font-sans text-shadow-sm">
-        Piezas de cuero genuino que cuentan historias. <br/> Hechas a mano, una a una, con pasión y tiempo.
+        {settings.heroLine1} {settings.heroLine2 && <><br/> {settings.heroLine2}</>}
       </p>
       <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up delay-300">
-        <Link to="/catalogo" className="bg-[#f5ead6] text-[#5d2f0d] px-8 py-3 rounded-full font-bold hover:bg-white transition-all shadow-lg hover:shadow-xl hover:scale-105 border border-leather-400">Ver Tienda Online</Link>
+        <Link to="/catalogo" className="bg-leather-100 text-leather-900 px-8 py-3 rounded-full font-bold hover:bg-white transition-all shadow-lg hover:shadow-xl hover:scale-105 border border-leather-400">{settings.heroCta}</Link>
       </div>
     </div>
   </section>
-);
+  );
+};
 
 // --- Cómo Comprar (nuevo) ---
 const HowToBuySection = () => {
@@ -884,7 +922,7 @@ const FeaturedCarousel = () => {
   const visibleProducts = displayProducts.slice(startIndex, startIndex + 3);
 
   return (
-    <section id="coleccion" className="py-24 border-t border-leather-100 scroll-mt-20 relative bg-[#fdfbf7]">
+    <section id="coleccion" className="py-24 border-t border-leather-100 scroll-mt-20 relative bg-[rgb(var(--paper))]">
       <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none"></div>
       <div className="max-w-7xl mx-auto px-4 relative z-10">
         <div className="text-center mb-12">
@@ -1426,15 +1464,22 @@ const ProductForm = ({ initial, categories, exchangeRate, onSave, onCancel }: {
 
 // --- Panel de Administración ---
 const AdminPanel = () => {
-  const { products, fairs, history, blogPosts, categories, exchangeRate, logout, addProduct, updateProduct, deleteProduct, addFair, updateFair, deleteFair, addHistoryEvent, updateHistoryEvent, deleteHistoryEvent, addBlogPost, updateBlogPost, deleteBlogPost, addCategory, deleteCategory } = useStore();
-  const [activeTab, setActiveTab] = useState<'products' | 'fairs' | 'history' | 'blog' | 'categories' | 'ayuda' | 'system'>('products');
+  const { products, fairs, history, blogPosts, categories, exchangeRate, settings, updateSettings, logout, addProduct, updateProduct, deleteProduct, addFair, updateFair, deleteFair, addHistoryEvent, updateHistoryEvent, deleteHistoryEvent, addBlogPost, updateBlogPost, deleteBlogPost, addCategory, deleteCategory } = useStore();
+  const [activeTab, setActiveTab] = useState<'products' | 'fairs' | 'history' | 'blog' | 'categories' | 'personalizar' | 'ayuda' | 'system'>('products');
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [editingFair, setEditingFair] = useState<Partial<Fair> | null>(null);
   const [editingHistory, setEditingHistory] = useState<Partial<HistoryEvent> | null>(null);
   const [editingBlog, setEditingBlog] = useState<Partial<BlogPost> | null>(null);
   const [newCategory, setNewCategory] = useState('');
   const [copied, setCopied] = useState(false);
+  const [heroDraft, setHeroDraft] = useState({ heroEyebrow: settings.heroEyebrow, heroLine1: settings.heroLine1, heroLine2: settings.heroLine2, heroCta: settings.heroCta });
+  const [savingHero, setSavingHero] = useState(false);
   const navigate = useNavigate();
+
+  // Cuando llegan los settings de la nube, refrescar el borrador de textos
+  useEffect(() => {
+    setHeroDraft({ heroEyebrow: settings.heroEyebrow, heroLine1: settings.heroLine1, heroLine2: settings.heroLine2, heroCta: settings.heroCta });
+  }, [settings.heroEyebrow, settings.heroLine1, settings.heroLine2, settings.heroCta]);
 
   usePageMeta("Panel de Administración - MARIEL'LA");
 
@@ -1461,6 +1506,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
     { key: 'fairs', label: 'Ferias' },
     { key: 'history', label: 'Historia' },
     { key: 'blog', label: 'Blog' },
+    { key: 'personalizar', label: '🎨 Personalizar' },
     { key: 'ayuda', label: '❓ Ayuda' },
     { key: 'system', label: 'Sistema' },
   ];
@@ -1494,6 +1540,82 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
             ))}
           </div>
           <div className="p-8">
+            {activeTab === 'personalizar' && (
+              <div className="animate-fade-in-up max-w-3xl space-y-10">
+                <div>
+                  <h2 className="text-2xl font-serif font-bold text-leather-900 mb-2 flex items-center gap-2"><Palette size={24} /> Colores de la página</h2>
+                  <p className="text-leather-600 text-sm font-medium mb-6">Elegí el tema y toda la página cambia de color al instante, para todos los visitantes. Probá tranquila: podés volver a cambiarlo cuando quieras.</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {THEMES.map(theme => (
+                      <button
+                        key={theme.id}
+                        onClick={() => updateSettings({ ...settings, theme: theme.id })}
+                        aria-pressed={settings.theme === theme.id}
+                        className={`p-4 rounded-xl border-2 transition-all text-left hover:shadow-md ${settings.theme === theme.id ? 'border-leather-900 bg-leather-50 shadow-md' : 'border-leather-100 bg-white hover:border-leather-300'}`}
+                      >
+                        <div className="flex gap-1.5 mb-3">
+                          {theme.swatch.map((color, i) => (
+                            <span key={i} className="w-7 h-7 rounded-full border border-black/10 shadow-sm" style={{ backgroundColor: color }} />
+                          ))}
+                        </div>
+                        <span className="font-bold text-leather-900 text-sm flex items-center gap-1.5">
+                          {theme.name}
+                          {settings.theme === theme.id && <CheckCircle size={15} className="text-green-600" />}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-leather-100 pt-8">
+                  <h2 className="text-2xl font-serif font-bold text-leather-900 mb-2">Textos de la portada</h2>
+                  <p className="text-leather-600 text-sm font-medium mb-6">Estos son los textos que se ven en la pantalla principal, arriba de todo.</p>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (savingHero) return;
+                    setSavingHero(true);
+                    await updateSettings({
+                      ...settings,
+                      heroEyebrow: heroDraft.heroEyebrow.trim() || DEFAULT_SETTINGS.heroEyebrow,
+                      heroLine1: heroDraft.heroLine1.trim() || DEFAULT_SETTINGS.heroLine1,
+                      heroLine2: heroDraft.heroLine2.trim(),
+                      heroCta: heroDraft.heroCta.trim() || DEFAULT_SETTINGS.heroCta,
+                    });
+                    setSavingHero(false);
+                  }} className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-leather-700 mb-1 block">Texto chico de arriba</label>
+                      <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" maxLength={60} value={heroDraft.heroEyebrow} onChange={e => setHeroDraft({ ...heroDraft, heroEyebrow: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-leather-700 mb-1 block">Frase principal (primera línea)</label>
+                      <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" maxLength={90} value={heroDraft.heroLine1} onChange={e => setHeroDraft({ ...heroDraft, heroLine1: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-leather-700 mb-1 block">Frase principal (segunda línea — podés dejarla vacía)</label>
+                      <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" maxLength={90} value={heroDraft.heroLine2} onChange={e => setHeroDraft({ ...heroDraft, heroLine2: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-leather-700 mb-1 block">Texto del botón</label>
+                      <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" maxLength={35} value={heroDraft.heroCta} onChange={e => setHeroDraft({ ...heroDraft, heroCta: e.target.value })} />
+                    </div>
+                    {/* Vista previa simple de la portada */}
+                    <div className="rounded-xl overflow-hidden border border-leather-200">
+                      <div className="bg-leather-900 px-6 py-8 text-center">
+                        <span className="block text-leather-100 text-[10px] tracking-[0.3em] uppercase mb-3 font-bold">{heroDraft.heroEyebrow || DEFAULT_SETTINGS.heroEyebrow}</span>
+                        <div className="inline-block leather-patch rounded-md px-6 py-3 mb-3"><span className="text-stitch font-serif font-bold text-2xl">MARIEL'LA</span></div>
+                        <p className="text-leather-50 text-sm font-light">{heroDraft.heroLine1 || DEFAULT_SETTINGS.heroLine1}{heroDraft.heroLine2 ? <><br/>{heroDraft.heroLine2}</> : null}</p>
+                        <span className="inline-block mt-4 bg-leather-100 text-leather-900 px-5 py-1.5 rounded-full font-bold text-xs">{heroDraft.heroCta || DEFAULT_SETTINGS.heroCta}</span>
+                      </div>
+                      <p className="text-center text-[11px] text-leather-400 py-2 bg-leather-50">Vista previa — así se ve arriba de la portada</p>
+                    </div>
+                    <div className="flex justify-end">
+                      <button type="submit" disabled={savingHero} className="px-8 py-3 bg-leather-900 text-white rounded-lg font-bold hover:bg-leather-800 transition disabled:opacity-50">{savingHero ? 'Guardando...' : 'Guardar textos'}</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
             {activeTab === 'ayuda' && (
               <div className="animate-fade-in-up max-w-3xl space-y-8">
                 <div className="bg-leather-50 p-6 rounded-xl border border-leather-200">
@@ -1522,6 +1644,11 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                 <div className="space-y-6">
                   <h3 className="text-xl font-serif font-bold text-leather-900 border-b border-leather-100 pb-2">📅 Ferias, 📖 Historia y ✍️ Blog</h3>
                   <p className="text-leather-700 text-sm font-medium"><span className="font-bold">Ferias:</span> cargá las próximas fechas en la pestaña Ferias (aparecen en la portada). Cuando pasan, editá y cambiá el estado a "Pasada".<br/><br/><span className="font-bold">Blog:</span> para contar novedades (una nota de radio, una feria linda, consejos de cuidado del cuero). Con título, un textito y una foto alcanza.<br/><br/><span className="font-bold">Historia:</span> los hitos que se ven en la página "Historia".</p>
+                </div>
+
+                <div className="space-y-6">
+                  <h3 className="text-xl font-serif font-bold text-leather-900 border-b border-leather-100 pb-2">🎨 Cambiar los colores y textos de la página</h3>
+                  <p className="text-leather-700 text-sm font-medium">En la pestaña <span className="font-bold">Personalizar</span> podés elegir entre 6 combinaciones de colores (tocás una y la página entera cambia al instante) y editar los textos de la portada: la frase principal y el botón. Todo con vista previa.</p>
                 </div>
 
                 <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl space-y-3">
@@ -1873,7 +2000,7 @@ const HistoryPage = () => {
   const { history } = useStore();
   usePageMeta("Nuestra Historia - MARIEL'LA", 'La trayectoria de MARIEL\'LA: de la tapicería familiar TAPIPOCITOS al taller de Piriápolis. Tradición artesanal uruguaya.');
   return (
-    <div className="pt-36 pb-24 bg-[#fdfbf7] min-h-screen relative">
+    <div className="pt-36 pb-24 bg-[rgb(var(--paper))] min-h-screen relative">
       <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none"></div>
       <div className="max-w-4xl mx-auto px-4 relative z-10">
         <div className="text-center mb-20">
@@ -1900,7 +2027,7 @@ const HistoryPage = () => {
                 </div>
 
                 {/* Timeline Dot */}
-                <div className="hidden md:flex items-center justify-center w-6 h-6 rounded-full bg-leather-900 border-4 border-[#fdfbf7] z-10 shadow-lg flex-shrink-0"></div>
+                <div className="hidden md:flex items-center justify-center w-6 h-6 rounded-full bg-leather-900 border-4 border-[rgb(var(--paper))] z-10 shadow-lg flex-shrink-0"></div>
 
                 <div className="flex-1 w-full">
                   <div className="relative aspect-[4/3] bg-white p-3 shadow-xl transform rotate-1 hover:rotate-0 transition-transform duration-500 border border-leather-200 rounded-sm">

@@ -1,4 +1,4 @@
-import { Product, Fair, HistoryEvent, BlogPost } from '../types';
+import { Product, Fair, HistoryEvent, BlogPost, SiteSettings, ThemeName } from '../types';
 import { supabase } from './supabaseClient';
 import { INITIAL_PRODUCTS, INITIAL_FAIRS, INITIAL_HISTORY, INITIAL_BLOG_POSTS, INITIAL_CATEGORIES } from '../constants';
 
@@ -9,7 +9,18 @@ const T = {
   history: 'mariella_history_events',
   blog: 'mariella_blog_posts',
   categories: 'mariella_categories',
+  settings: 'mariella_settings',
 } as const;
+
+export const DEFAULT_SETTINGS: SiteSettings = {
+  theme: 'cuero',
+  heroEyebrow: 'Artesanía Uruguaya',
+  heroLine1: 'Piezas de cuero genuino que cuentan historias.',
+  heroLine2: 'Hechas a mano, una a una, con pasión y tiempo.',
+  heroCta: 'Ver Tienda Online',
+};
+
+const VALID_THEMES: ThemeName[] = ['cuero', 'vino', 'oliva', 'noche', 'terracota', 'rosa'];
 
 const BUCKET = 'mariella';
 
@@ -229,6 +240,35 @@ export const StorageService = {
   deleteCategory: async (name: string): Promise<void> => {
     const { error } = await supabase.from(T.categories).delete().eq('name', name);
     throwIfError(error, 'eliminar categoría');
+  },
+
+  // Personalización (tema + textos de portada)
+  getSettings: async (): Promise<SiteSettings> => {
+    const { data, error } = await supabase.from(T.settings).select('*').eq('id', 1).maybeSingle();
+    if (error || !data) {
+      if (error) console.error('Error fetching settings:', error);
+      return DEFAULT_SETTINGS;
+    }
+    return {
+      theme: VALID_THEMES.includes(data.theme) ? data.theme : 'cuero',
+      heroEyebrow: data.hero_eyebrow ?? DEFAULT_SETTINGS.heroEyebrow,
+      heroLine1: data.hero_line1 ?? DEFAULT_SETTINGS.heroLine1,
+      heroLine2: data.hero_line2 ?? DEFAULT_SETTINGS.heroLine2,
+      heroCta: data.hero_cta ?? DEFAULT_SETTINGS.heroCta,
+    };
+  },
+
+  saveSettings: async (s: SiteSettings): Promise<void> => {
+    const { error } = await supabase.from(T.settings).upsert({
+      id: 1,
+      theme: s.theme,
+      hero_eyebrow: s.heroEyebrow,
+      hero_line1: s.heroLine1,
+      hero_line2: s.heroLine2,
+      hero_cta: s.heroCta,
+      updated_at: new Date().toISOString(),
+    });
+    throwIfError(error, 'guardar personalización');
   },
 
   // Image Upload

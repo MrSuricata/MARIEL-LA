@@ -62,6 +62,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <!-- Aplica el tema guardado antes del primer render para evitar parpadeo -->
+    <script>
+      try {
+        var t = localStorage.getItem('mariella_theme');
+        if (t && t !== 'cuero' && /^[a-z]+$/.test(t)) document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
   </head>
   <body class="bg-leather-50 text-leather-900 font-sans antialiased selection:bg-leather-200">
     <div id="root"></div>
