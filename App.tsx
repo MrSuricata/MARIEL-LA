@@ -1638,14 +1638,24 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
   );
 
   return (
-    <div className="min-h-screen bg-leather-50 pt-36 pb-12 animate-fade-in-up">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between items-center mb-10 bg-white p-6 rounded-xl shadow-sm border border-leather-100 gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold text-leather-900">Panel de Administración</h1>
+    <div className="min-h-screen bg-leather-50 pt-36 pb-12 animate-fade-in-up relative">
+      {/* Textura de la marca para que el fondo no quede pelado */}
+      <div className="absolute inset-0 opacity-60 bg-[radial-gradient(circle,rgba(103,51,30,0.05)_1px,transparent_1px)] bg-[size:14px_14px] pointer-events-none"></div>
+      <div className="max-w-7xl mx-auto px-4 relative z-10">
+        <div className="flex justify-between items-start mb-10 bg-white p-6 rounded-xl shadow-sm border border-leather-100 gap-4 flex-wrap relative overflow-hidden">
+          <div className="absolute -right-8 -top-10 w-44 h-44 rounded-full bg-leather-50 opacity-70 pointer-events-none"></div>
+          <div className="relative z-10">
+            <h1 className="text-2xl font-serif font-bold text-leather-900">Panel de Administración</h1>
             <p className="text-sm text-leather-500 font-medium mt-1">Hola Mariela 👋 Todo lo que cambies acá se publica al instante.</p>
+            <div className="flex flex-wrap gap-2 mt-4">
+              <span className="inline-flex items-center gap-1.5 bg-leather-50 border border-leather-100 text-leather-700 text-xs font-bold px-3 py-1.5 rounded-full"><Package size={13} /> {products.length} {products.length === 1 ? 'pieza' : 'piezas'}</span>
+              <span className="inline-flex items-center gap-1.5 bg-leather-50 border border-leather-100 text-leather-700 text-xs font-bold px-3 py-1.5 rounded-full"><Star size={13} className="fill-amber-400 text-amber-400" /> {products.filter(p => p.isFeatured).length} destacadas</span>
+              <span className="inline-flex items-center gap-1.5 bg-leather-50 border border-leather-100 text-leather-700 text-xs font-bold px-3 py-1.5 rounded-full"><CheckCircle size={13} /> {products.filter(p => p.isSoldOut).length} vendidas</span>
+              <span className="inline-flex items-center gap-1.5 bg-leather-50 border border-leather-100 text-leather-700 text-xs font-bold px-3 py-1.5 rounded-full"><Calendar size={13} /> {fairs.filter(f => f.status === 'upcoming').length} {fairs.filter(f => f.status === 'upcoming').length === 1 ? 'feria próxima' : 'ferias próximas'}</span>
+              <span className="inline-flex items-center gap-1.5 bg-leather-50 border border-leather-100 text-leather-700 text-xs font-bold px-3 py-1.5 rounded-full"><ScrollText size={13} /> {blogPosts.length} posts</span>
+            </div>
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-red-600 font-medium px-4 py-2 hover:bg-red-50 rounded-lg"><LogOut size={18} /> Salir</button>
+          <button onClick={handleLogout} className="relative z-10 flex items-center gap-2 text-red-600 font-medium px-4 py-2 hover:bg-red-50 rounded-lg"><LogOut size={18} /> Salir</button>
         </div>
         <div className="bg-white rounded-xl shadow-lg border border-leather-200 min-h-[600px] overflow-hidden">
           <div className="border-b border-leather-200 px-8 py-5 flex gap-8 bg-leather-50/50 overflow-x-auto">
