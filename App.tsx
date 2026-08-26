@@ -482,15 +482,77 @@ const CurrencyToggle = () => {
 };
 
 // --- Skeletons de carga ---
-const ProductCardSkeleton = ({ tall = false }: { tall?: boolean }) => (
-  <div className="bg-white rounded-xl overflow-hidden border border-leather-100 shadow-sm">
-    <div className={`${tall ? 'aspect-[4/5]' : 'aspect-square'} skeleton`} />
-    <div className="p-4 space-y-3">
+const ProductCardSkeleton = ({ tall: _tall = false }: { tall?: boolean }) => (
+  <div>
+    <div className="aspect-[4/5] skeleton rounded-2xl" />
+    <div className="mt-4 space-y-2 px-0.5">
+      <div className="h-3 w-1/4 skeleton rounded" />
       <div className="h-5 w-3/4 skeleton rounded" />
       <div className="h-4 w-1/3 skeleton rounded" />
     </div>
   </div>
 );
+
+// --- Tarjeta de producto (estilo galería) ---
+// La foto es la protagonista: sin caja blanca, texto respirando sobre el fondo,
+// segunda foto al pasar el mouse y la costura de la marca como firma.
+const ProductCard = ({ product, showBadge = true }: { product: Product; showBadge?: boolean }) => {
+  const { currency, convertPrice, addToCart } = useStore();
+  const hasSecond = product.images.length > 1;
+  return (
+    <div className="group">
+      <Link to={`/producto/${product.id}`} className="block relative aspect-[4/5] rounded-2xl overflow-hidden bg-leather-100/60 shadow-sm transition-shadow duration-500 group-hover:shadow-xl">
+        <img
+          src={imgSrc(product.images, 600)}
+          alt={product.name}
+          className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 group-hover:scale-[1.06] ${product.isSoldOut ? 'grayscale-[35%] opacity-90' : ''} ${hasSecond ? 'group-hover:opacity-0' : ''}`}
+          loading="lazy"
+          onError={handleImgError}
+        />
+        {hasSecond && (
+          <img
+            src={imgSrc(product.images, 600, 1)}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover opacity-0 transition-all duration-700 group-hover:opacity-100 group-hover:scale-[1.06]"
+            loading="lazy"
+            onError={handleImgError}
+          />
+        )}
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-leather-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+        <div className="absolute inset-2.5 rounded-xl border border-dashed border-white/60 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+        {showBadge && product.isFeatured && !product.isSoldOut && (
+          <span className="absolute top-3 left-3 inline-flex items-center gap-1 bg-leather-50/95 backdrop-blur-sm text-leather-800 text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+            <Star size={11} className="fill-amber-400 text-amber-400" /> Destacada
+          </span>
+        )}
+        {product.isSoldOut && (
+          <span className="absolute bottom-3 left-3 bg-leather-900/85 backdrop-blur-sm text-leather-50 text-[11px] font-bold tracking-wider uppercase px-3 py-1.5 rounded-full">
+            Vendida
+          </span>
+        )}
+      </Link>
+      <div className="mt-3.5 flex items-start justify-between gap-3 px-0.5">
+        <div className="min-w-0">
+          <span className="block text-[11px] uppercase tracking-[0.14em] font-bold text-leather-500 mb-0.5">{product.category}</span>
+          <Link to={`/producto/${product.id}`}>
+            <h3 className="font-serif font-bold text-leather-900 leading-snug text-base sm:text-lg group-hover:text-leather-600 transition-colors">{product.name}</h3>
+          </Link>
+          <p className={`mt-1 font-medium ${product.isSoldOut ? 'text-leather-400 line-through' : 'text-leather-700'}`}>{formatPrice(convertPrice(product.priceUYU), currency)}</p>
+        </div>
+        {!product.isSoldOut && (
+          <button
+            onClick={() => addToCart(product)}
+            className="mt-1 flex-shrink-0 w-10 h-10 rounded-full bg-leather-900 text-leather-50 flex items-center justify-center shadow-md hover:bg-leather-700 hover:scale-110 active:scale-95 transition-all"
+            aria-label={`Agregar ${product.name} al carrito`}
+          >
+            <ShoppingBag size={17} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const BlogCardSkeleton = () => (
   <div className="bg-white rounded-xl overflow-hidden border border-leather-100 shadow-sm">
@@ -505,14 +567,17 @@ const BlogCardSkeleton = () => (
 
 // --- Navbar & UI Components ---
 
-const TopBar = () => (
-  <div className="bg-leather-900 text-leather-200 text-xs py-2 px-4 text-center tracking-widest uppercase font-bold border-b border-leather-800 hidden sm:block">
-    <div className="max-w-7xl mx-auto flex justify-between items-center">
-      <span className="flex items-center gap-2"><Truck size={14} /> Envíos a todo el país</span>
-      <span className="flex items-center gap-2">Artesanía 100% Uruguaya <Heart size={12} className="text-red-500 fill-current" /></span>
+const TopBar = () => {
+  const { settings } = useStore();
+  return (
+    <div className="bg-leather-900 text-leather-200 text-xs py-2 px-4 text-center tracking-widest uppercase font-bold border-b border-leather-800 hidden sm:block">
+      <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <span className="flex items-center gap-2"><Truck size={14} /> {settings.topbarLeft}</span>
+        <span className="flex items-center gap-2">{settings.topbarRight} <Heart size={12} className="text-red-500 fill-current" /></span>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const FloatingWhatsApp = () => (
   <a
@@ -943,41 +1008,21 @@ const FeaturedCarousel = () => {
         ) : (
         <>
         <div className="hidden md:block relative">
-           <div className="flex gap-8 justify-center">
+           <div className="grid grid-cols-3 gap-8">
              {visibleProducts.map((product) => (
-                <div key={product.id} className="w-1/3 group relative">
-                  <Link to={`/producto/${product.id}`} className="block">
-                    <div className="aspect-[4/5] overflow-hidden rounded-lg mb-4 relative shadow-md">
-                       <img src={imgSrc(product.images, 600)} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" onError={handleImgError} />
-                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-leather-900/80 backdrop-blur-sm text-white text-sm px-4 py-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none font-bold shadow-xl text-center min-w-[140px]">{product.name}</div>
-                    </div>
-                    <h3 className="text-xl font-serif font-bold text-leather-900">{product.name}</h3>
-                    <p className="text-leather-600 font-bold text-lg">{formatPrice(convertPrice(product.priceUYU), currency)}</p>
-                  </Link>
-                </div>
+                <ProductCard key={product.id} product={product} showBadge={false} />
              ))}
            </div>
            {displayProducts.length > 3 && (
              <>
-               <button onClick={prevSlide} className="absolute top-1/2 -left-4 -translate-y-1/2 bg-white text-leather-900 p-3 rounded-full shadow-lg hover:bg-leather-100 border border-leather-100 transition-all z-10" aria-label="Anterior"><ChevronLeft size={24} /></button>
-               <button onClick={nextSlide} className="absolute top-1/2 -right-4 -translate-y-1/2 bg-white text-leather-900 p-3 rounded-full shadow-lg hover:bg-leather-100 border border-leather-100 transition-all z-10" aria-label="Siguiente"><ChevronRight size={24} /></button>
+               <button onClick={prevSlide} className="absolute top-1/2 -left-5 -translate-y-1/2 bg-white text-leather-900 p-3 rounded-full shadow-lg hover:bg-leather-100 border border-leather-100 transition-all z-10" aria-label="Anterior"><ChevronLeft size={24} /></button>
+               <button onClick={nextSlide} className="absolute top-1/2 -right-5 -translate-y-1/2 bg-white text-leather-900 p-3 rounded-full shadow-lg hover:bg-leather-100 border border-leather-100 transition-all z-10" aria-label="Siguiente"><ChevronRight size={24} /></button>
              </>
            )}
         </div>
-        <div className="md:hidden grid grid-cols-1 gap-8">
-           {displayProducts.slice(0, 3).map((product) => (
-              <div key={product.id} className="group">
-                  <Link to={`/producto/${product.id}`} className="block">
-                    <div className="aspect-square overflow-hidden rounded-lg mb-4 relative shadow-md">
-                       <img src={imgSrc(product.images, 600)} alt={product.name} className="w-full h-full object-cover" loading="lazy" onError={handleImgError} />
-                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4 pt-12"><span className="text-white font-bold text-sm">{product.name}</span></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                       <h3 className="text-xl font-serif font-bold text-leather-900">{product.name}</h3>
-                       <p className="text-leather-600 font-bold">{formatPrice(convertPrice(product.priceUYU), currency)}</p>
-                    </div>
-                  </Link>
-              </div>
+        <div className="md:hidden grid grid-cols-2 gap-x-4 gap-y-8">
+           {displayProducts.slice(0, 4).map((product) => (
+              <ProductCard key={product.id} product={product} showBadge={false} />
            ))}
         </div>
         </>
@@ -1024,14 +1069,16 @@ const FairsTeaser = () => {
   );
 };
 
-const ContactSection = () => (
+const ContactSection = () => {
+  const { settings } = useStore();
+  return (
   <section id="contacto" className="py-24 bg-leather-100 scroll-mt-20">
     <div className="max-w-5xl mx-auto px-4">
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row border border-leather-200">
         <div className="md:w-1/2 p-12 flex flex-col justify-center bg-leather-900 text-white relative overflow-hidden">
           <div className="relative z-10">
             <h2 className="text-3xl font-serif font-bold mb-6">Hablemos</h2>
-            <p className="text-leather-200 mb-8 leading-relaxed font-medium">¿Tenés una idea especial? ¿Querés personalizar un producto? Estamos aquí para responder todas tus dudas.</p>
+            <p className="text-leather-200 mb-8 leading-relaxed font-medium">{settings.contactText}</p>
             <div className="space-y-6">
               <a href={waLink('¡Hola MARIEL\'LA! Quiero hacerles una consulta 😊')} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 group cursor-pointer hover:bg-leather-800 p-2 -ml-2 rounded-lg transition-colors">
                  <div className="bg-[#25D366] p-1 rounded-full"><MessageCircle size={18} className="text-white fill-white" /></div>
@@ -1061,7 +1108,8 @@ const ContactSection = () => (
       </div>
     </div>
   </section>
-);
+  );
+};
 
 const BlogPage = () => {
   const { blogPosts, loading } = useStore();
@@ -1332,17 +1380,9 @@ const ProductDetail = () => {
           {relatedProducts.length > 0 && (
             <div className="border-t border-leather-100 pt-16">
               <h2 className="text-2xl font-serif font-bold text-leather-900 mb-8">También te podría gustar</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-5 gap-y-10 sm:gap-x-8">
                 {relatedProducts.map(rp => (
-                  <div key={rp.id} className="group">
-                    <Link to={`/producto/${rp.id}`} className="block">
-                      <div className="aspect-square rounded-xl overflow-hidden mb-4 border border-leather-100 shadow-sm">
-                        <img src={imgSrc(rp.images, 600)} alt={rp.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" onError={handleImgError} />
-                      </div>
-                      <h3 className="font-bold text-leather-900 text-lg group-hover:text-leather-600 transition">{rp.name}</h3>
-                      <p className="text-leather-600 font-medium">{formatPrice(convertPrice(rp.priceUYU), currency)}</p>
-                    </Link>
-                  </div>
+                  <ProductCard key={rp.id} product={rp} showBadge={false} />
                 ))}
               </div>
             </div>
@@ -1472,14 +1512,14 @@ const AdminPanel = () => {
   const [editingBlog, setEditingBlog] = useState<Partial<BlogPost> | null>(null);
   const [newCategory, setNewCategory] = useState('');
   const [copied, setCopied] = useState(false);
-  const [heroDraft, setHeroDraft] = useState({ heroEyebrow: settings.heroEyebrow, heroLine1: settings.heroLine1, heroLine2: settings.heroLine2, heroCta: settings.heroCta });
+  const [heroDraft, setHeroDraft] = useState({ heroEyebrow: settings.heroEyebrow, heroLine1: settings.heroLine1, heroLine2: settings.heroLine2, heroCta: settings.heroCta, topbarLeft: settings.topbarLeft, topbarRight: settings.topbarRight, contactText: settings.contactText, footerTagline: settings.footerTagline });
   const [savingHero, setSavingHero] = useState(false);
   const navigate = useNavigate();
 
   // Cuando llegan los settings de la nube, refrescar el borrador de textos
   useEffect(() => {
-    setHeroDraft({ heroEyebrow: settings.heroEyebrow, heroLine1: settings.heroLine1, heroLine2: settings.heroLine2, heroCta: settings.heroCta });
-  }, [settings.heroEyebrow, settings.heroLine1, settings.heroLine2, settings.heroCta]);
+    setHeroDraft({ heroEyebrow: settings.heroEyebrow, heroLine1: settings.heroLine1, heroLine2: settings.heroLine2, heroCta: settings.heroCta, topbarLeft: settings.topbarLeft, topbarRight: settings.topbarRight, contactText: settings.contactText, footerTagline: settings.footerTagline });
+  }, [settings]);
 
   usePageMeta("Panel de Administración - MARIEL'LA");
 
@@ -1580,6 +1620,10 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                       heroLine1: heroDraft.heroLine1.trim() || DEFAULT_SETTINGS.heroLine1,
                       heroLine2: heroDraft.heroLine2.trim(),
                       heroCta: heroDraft.heroCta.trim() || DEFAULT_SETTINGS.heroCta,
+                      topbarLeft: heroDraft.topbarLeft.trim() || DEFAULT_SETTINGS.topbarLeft,
+                      topbarRight: heroDraft.topbarRight.trim() || DEFAULT_SETTINGS.topbarRight,
+                      contactText: heroDraft.contactText.trim() || DEFAULT_SETTINGS.contactText,
+                      footerTagline: heroDraft.footerTagline.trim() || DEFAULT_SETTINGS.footerTagline,
                     });
                     setSavingHero(false);
                   }} className="space-y-4">
@@ -1609,6 +1653,27 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                       </div>
                       <p className="text-center text-[11px] text-leather-400 py-2 bg-leather-50">Vista previa — así se ve arriba de la portada</p>
                     </div>
+
+                    <h3 className="text-lg font-serif font-bold text-leather-900 pt-4 border-t border-leather-100">Textos generales de la página</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-leather-700 mb-1 block">Barra de arriba — izquierda</label>
+                        <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" maxLength={40} value={heroDraft.topbarLeft} onChange={e => setHeroDraft({ ...heroDraft, topbarLeft: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-leather-700 mb-1 block">Barra de arriba — derecha</label>
+                        <input className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" maxLength={40} value={heroDraft.topbarRight} onChange={e => setHeroDraft({ ...heroDraft, topbarRight: e.target.value })} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-leather-700 mb-1 block">Texto de "Hablemos" (sección de contacto)</label>
+                      <textarea className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-20" maxLength={220} value={heroDraft.contactText} onChange={e => setHeroDraft({ ...heroDraft, contactText: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-leather-700 mb-1 block">Frase del pie de página</label>
+                      <textarea className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none h-16" maxLength={180} value={heroDraft.footerTagline} onChange={e => setHeroDraft({ ...heroDraft, footerTagline: e.target.value })} />
+                    </div>
+
                     <div className="flex justify-end">
                       <button type="submit" disabled={savingHero} className="px-8 py-3 bg-leather-900 text-white rounded-lg font-bold hover:bg-leather-800 transition disabled:opacity-50">{savingHero ? 'Guardando...' : 'Guardar textos'}</button>
                     </div>
@@ -1648,7 +1713,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
 
                 <div className="space-y-6">
                   <h3 className="text-xl font-serif font-bold text-leather-900 border-b border-leather-100 pb-2">🎨 Cambiar los colores y textos de la página</h3>
-                  <p className="text-leather-700 text-sm font-medium">En la pestaña <span className="font-bold">Personalizar</span> podés elegir entre 6 combinaciones de colores (tocás una y la página entera cambia al instante) y editar los textos de la portada: la frase principal y el botón. Todo con vista previa.</p>
+                  <p className="text-leather-700 text-sm font-medium">En la pestaña <span className="font-bold">Personalizar</span> podés elegir entre 6 combinaciones de colores (tocás una y la página entera cambia al instante) y editar los <span className="font-bold">textos de la portada</span> (con vista previa) y los <span className="font-bold">textos generales</span>: la barra de arriba, el texto de "Hablemos" y la frase del pie de página. Todo se puede volver a cambiar cuando quieras.</p>
                 </div>
 
                 <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl space-y-3">
@@ -1870,7 +1935,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
 type SortOption = 'destacados' | 'precio-asc' | 'precio-desc' | 'recientes';
 
 const CatalogPage = () => {
-  const { products, currency, convertPrice, addToCart, categories, loading } = useStore();
+  const { products, categories, loading } = useStore();
   const [filter, setFilter] = useState('Todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [sort, setSort] = useState<SortOption>('destacados');
@@ -1958,28 +2023,13 @@ const CatalogPage = () => {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-10 sm:gap-x-7">
             {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
           </div>
         ) : sorted.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-10 sm:gap-x-7 sm:gap-y-12">
             {sorted.map(product => (
-              <div key={product.id} className={`bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all group border border-leather-100 ${product.isSoldOut ? 'opacity-75' : ''}`}>
-                <Link to={`/producto/${product.id}`} className="block relative aspect-square overflow-hidden">
-                  <img src={imgSrc(product.images, 400)} className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${product.isSoldOut ? 'grayscale-[30%]' : ''}`} alt={product.name} loading="lazy" onError={handleImgError} />
-                  {product.isFeatured && !product.isSoldOut && (
-                    <span className="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/90 backdrop-blur-sm text-leather-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm border border-leather-100"><Star size={12} className="fill-amber-400 text-amber-400" /> Destacada</span>
-                  )}
-                  {product.isSoldOut && <div className="absolute inset-0 flex items-center justify-center"><span className="bg-red-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg uppercase tracking-wider">Agotado</span></div>}
-                </Link>
-                <div className="p-4">
-                  <Link to={`/producto/${product.id}`}><h3 className="font-bold text-lg text-leather-900 mb-2 group-hover:text-leather-600 transition-colors">{product.name}</h3></Link>
-                  <div className="flex justify-between items-center">
-                    <span className={`font-bold ${product.isSoldOut ? 'text-leather-400 line-through' : 'text-leather-600'}`}>{formatPrice(convertPrice(product.priceUYU), currency)}</span>
-                    {!product.isSoldOut && <button onClick={() => addToCart(product)} className="p-2 bg-leather-50 rounded-full hover:bg-leather-900 hover:text-white transition-colors border border-leather-100" aria-label={`Agregar ${product.name} al carrito`}><ShoppingBag size={18} /></button>}
-                  </div>
-                </div>
-              </div>
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         ) : (
@@ -2282,12 +2332,14 @@ const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
   );
 };
 
-const Footer = () => (
+const Footer = () => {
+  const { settings } = useStore();
+  return (
   <footer className="bg-leather-900 text-leather-300 py-16 border-t border-leather-800">
     <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-10">
       <div className="md:col-span-1">
         <h3 className="text-white font-serif font-bold text-2xl mb-4">MARIEL'LA</h3>
-        <p className="text-sm font-medium leading-relaxed mb-4">Artesanía en cuero con identidad uruguaya. Cada pieza cuenta una historia de tradición y pasión.</p>
+        <p className="text-sm font-medium leading-relaxed mb-4">{settings.footerTagline}</p>
         <div className="flex gap-4 mt-4">
           <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-leather-800 flex items-center justify-center hover:bg-leather-700 transition-colors" aria-label="Instagram"><Instagram size={18} className="text-leather-200" /></a>
           <a href={waLink()} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-leather-800 flex items-center justify-center hover:bg-[#25D366] transition-colors" aria-label="WhatsApp"><MessageCircle size={18} className="text-leather-200" /></a>
@@ -2324,7 +2376,8 @@ const Footer = () => (
       <p className="text-leather-500">Tradición artesanal familiar — hecho con <Heart size={10} className="inline text-red-400 fill-current" /> en Uruguay</p>
     </div>
   </footer>
-);
+  );
+};
 
 // --- 404 Page ---
 const NotFoundPage = () => {

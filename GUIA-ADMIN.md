@@ -47,7 +47,7 @@ portada y en el catálogo.
 
 ---
 
-## 3. Personalizar tu página 🎨 (¡nuevo!)
+## 3. Personalizar tu página 🎨
 
 En la pestaña **Personalizar** podés cambiar el look de TODA la página:
 
@@ -57,7 +57,11 @@ En la pestaña **Personalizar** podés cambiar el look de TODA la página:
   podés volver a cambiarla cuando quieras.
 - **Textos de la portada**: el texto chiquito de arriba, la frase principal
   (dos líneas) y el texto del botón. Abajo tenés una **vista previa** de cómo
-  queda, y cuando estés conforme tocás **Guardar textos**.
+  queda.
+- **Textos generales**: los dos mensajitos de la barra marrón de arriba,
+  el texto de la sección "Hablemos" y la frase del pie de página.
+
+Cuando estés conforme tocás **Guardar textos** y queda publicado al instante.
 
 ---
 

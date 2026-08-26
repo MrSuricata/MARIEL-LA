@@ -18,6 +18,10 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   heroLine1: 'Piezas de cuero genuino que cuentan historias.',
   heroLine2: 'Hechas a mano, una a una, con pasión y tiempo.',
   heroCta: 'Ver Tienda Online',
+  topbarLeft: 'Envíos a todo el país',
+  topbarRight: 'Artesanía 100% Uruguaya',
+  contactText: '¿Tenés una idea especial? ¿Querés personalizar un producto? Estamos aquí para responder todas tus dudas.',
+  footerTagline: 'Artesanía en cuero con identidad uruguaya. Cada pieza cuenta una historia de tradición y pasión.',
 };
 
 const VALID_THEMES: ThemeName[] = ['cuero', 'vino', 'oliva', 'noche', 'terracota', 'rosa'];
@@ -255,6 +259,10 @@ export const StorageService = {
       heroLine1: data.hero_line1 ?? DEFAULT_SETTINGS.heroLine1,
       heroLine2: data.hero_line2 ?? DEFAULT_SETTINGS.heroLine2,
       heroCta: data.hero_cta ?? DEFAULT_SETTINGS.heroCta,
+      topbarLeft: data.topbar_left ?? DEFAULT_SETTINGS.topbarLeft,
+      topbarRight: data.topbar_right ?? DEFAULT_SETTINGS.topbarRight,
+      contactText: data.contact_text ?? DEFAULT_SETTINGS.contactText,
+      footerTagline: data.footer_tagline ?? DEFAULT_SETTINGS.footerTagline,
     };
   },
 
@@ -266,6 +274,10 @@ export const StorageService = {
       hero_line1: s.heroLine1,
       hero_line2: s.heroLine2,
       hero_cta: s.heroCta,
+      topbar_left: s.topbarLeft,
+      topbar_right: s.topbarRight,
+      contact_text: s.contactText,
+      footer_tagline: s.footerTagline,
       updated_at: new Date().toISOString(),
     });
     throwIfError(error, 'guardar personalización');

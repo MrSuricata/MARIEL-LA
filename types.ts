@@ -72,4 +72,8 @@ export interface SiteSettings {
   heroLine1: string;
   heroLine2: string;
   heroCta: string;
+  topbarLeft: string;
+  topbarRight: string;
+  contactText: string;
+  footerTagline: string;
 }
