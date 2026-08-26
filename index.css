@@ -131,6 +131,10 @@ html {
 }
 
 .animate-fade-in-up { animation: fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+/* Fade sin transform: para contenedores que tienen hijos position:fixed
+   (un ancestro con transform se vuelve su containing block y los rompe) */
+@keyframes fadeInSoft { from { opacity: 0; } to { opacity: 1; } }
+.animate-fade-in { animation: fadeInSoft 0.45s ease-out forwards; }
 .animate-zoom-fade-in { animation: zoomFadeIn 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 .animate-slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
 .animate-cart-bounce { animation: cartBounce 0.4s ease-in-out; }

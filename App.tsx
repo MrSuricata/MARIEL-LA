@@ -1,4 +1,5 @@
 import React, { useState, useEffect, createContext, useContext, ReactNode, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ShoppingBag, Menu, X, Instagram, Phone, MapPin,
@@ -618,9 +619,10 @@ const TopBar = () => {
 };
 
 const FloatingWhatsApp = () => {
-  // En la ficha de producto no se muestra: ahí ya hay barra de compra y botón de consulta propios
+  // No se muestra en la ficha de producto (tiene barra de compra y consulta propias)
+  // ni en el panel/login (tapaba los botones de acción en el celular)
   const { pathname } = useLocation();
-  if (pathname.startsWith('/producto/')) return null;
+  if (pathname.startsWith('/producto/') || pathname.startsWith('/admin') || pathname.startsWith('/login')) return null;
   return (
   <a
     href={waLink('¡Hola MARIEL\'LA! Quiero hacerles una consulta 😊')}
@@ -1514,7 +1516,7 @@ const ProductForm = ({ initial, categories, exchangeRate, onSave, onCancel }: {
     if (ok) onCancel();
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-sm sm:max-w-2xl w-full border border-leather-200 my-8 max-h-[90vh] overflow-y-auto">
         <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{formData.id ? 'Editar' : 'Nuevo'} Producto</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -1574,7 +1576,8 @@ const ProductForm = ({ initial, categories, exchangeRate, onSave, onCancel }: {
           </div>
           <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={onCancel} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" disabled={uploading || saving} className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar'}</button></div>
         </form>
-    </div></div>
+    </div></div>,
+    document.body
   );
 };
 
@@ -1638,7 +1641,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
   );
 
   return (
-    <div className="min-h-screen bg-leather-50 pt-36 pb-12 animate-fade-in-up relative">
+    <div className="min-h-screen bg-leather-50 pt-36 pb-12 animate-fade-in relative">
       {/* Textura de la marca para que el fondo no quede pelado */}
       <div className="absolute inset-0 opacity-60 bg-[radial-gradient(circle,rgba(103,51,30,0.05)_1px,transparent_1px)] bg-[size:14px_14px] pointer-events-none"></div>
       <div className="max-w-7xl mx-auto px-4 relative z-10">
@@ -1658,7 +1661,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
           <button onClick={handleLogout} className="relative z-10 flex items-center gap-2 text-red-600 font-medium px-4 py-2 hover:bg-red-50 rounded-lg"><LogOut size={18} /> Salir</button>
         </div>
         <div className="bg-white rounded-xl shadow-lg border border-leather-200 min-h-[600px] overflow-hidden">
-          <div className="border-b border-leather-200 px-8 py-5 flex gap-8 bg-leather-50/50 overflow-x-auto">
+          <div className="border-b border-leather-200 px-5 sm:px-8 py-5 flex gap-6 sm:gap-8 bg-leather-50/50 overflow-x-auto scrollbar-hide">
             {tabs.map(tab => (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`text-lg font-bold pb-1 border-b-2 whitespace-nowrap ${activeTab === tab.key ? 'border-leather-900 text-leather-900' : 'border-transparent text-leather-400'}`}>
                 {tab.label}
@@ -1667,7 +1670,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
           </div>
           <div className="p-8">
             {activeTab === 'personalizar' && (
-              <div className="animate-fade-in-up max-w-3xl space-y-10">
+              <div className="animate-fade-in max-w-3xl space-y-10">
                 <div>
                   <h2 className="text-2xl font-serif font-bold text-leather-900 mb-2 flex items-center gap-2"><Palette size={24} /> Colores de la página</h2>
                   <p className="text-leather-600 text-sm font-medium mb-6">Elegí el tema y toda la página cambia de color al instante, para todos los visitantes. Probá tranquila: podés volver a cambiarlo cuando quieras.</p>
@@ -1768,7 +1771,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               </div>
             )}
             {activeTab === 'ayuda' && (
-              <div className="animate-fade-in-up max-w-3xl space-y-8">
+              <div className="animate-fade-in max-w-3xl space-y-8">
                 <div className="bg-leather-50 p-6 rounded-xl border border-leather-200">
                   <h2 className="text-2xl font-serif font-bold text-leather-900 mb-2 flex items-center gap-2"><HelpCircle size={24} /> Guía rápida</h2>
                   <p className="text-leather-700 font-medium">Todo lo que hagas acá se guarda solo y se ve al instante en la página. No tengas miedo de tocar: siempre podés editar o borrar después.</p>
@@ -1814,7 +1817,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               </div>
             )}
             {activeTab === 'system' && (
-              <div className="animate-fade-in-up max-w-2xl">
+              <div className="animate-fade-in max-w-2xl">
                  <h2 className="text-2xl font-serif font-bold text-leather-900 mb-4">Estado del Sistema</h2>
                  <div className="bg-green-50 p-6 rounded-xl border border-green-200 mb-6">
                    <h3 className="font-bold text-green-800 mb-2 flex items-center gap-2"><CheckCircle size={20} className="text-green-600" /> Base de datos conectada</h3>
@@ -1834,7 +1837,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               </div>
             )}
             {activeTab === 'categories' && (
-              <div className="animate-fade-in-up max-w-xl">
+              <div className="animate-fade-in max-w-xl">
                 <div className="flex gap-4 mb-8">
                   <input className="flex-1 p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-leather-500 focus:outline-none" placeholder="Nueva Categoría" value={newCategory} onChange={e => setNewCategory(e.target.value)} />
                   <button onClick={() => { const c = newCategory.trim(); if(c) { addCategory(c); setNewCategory(''); } }} className="bg-leather-900 text-white px-6 rounded-lg font-bold hover:bg-leather-800 transition">Agregar</button>
@@ -1850,7 +1853,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               </div>
             )}
             {activeTab === 'products' && (
-              <div className="animate-fade-in-up">
+              <div className="animate-fade-in">
                 <button onClick={() => setEditingProduct({})} className="mb-6 flex items-center gap-2 bg-leather-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-leather-800 transition"><Plus size={20} /> Nuevo Producto</button>
                 <div className="grid gap-4">{products.map(p => (
                   <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white gap-4 flex-wrap">
@@ -1887,7 +1890,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
               </div>
             )}
             {activeTab === 'fairs' && (
-              <div className="animate-fade-in-up">
+              <div className="animate-fade-in">
                  <button onClick={() => setEditingFair({})} className="mb-6 flex items-center gap-2 bg-leather-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-leather-800 transition"><Plus size={20} /> Nueva Feria</button>
                  <div className="grid gap-4">{fairs.map(f => (
                    <div key={f.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white gap-4">
@@ -1902,7 +1905,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                       </div>
                    </div>
                  ))}</div>
-                 {editingFair && (
+                 {editingFair && createPortal(
                    <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200 my-8">
                      <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{editingFair.id ? 'Editar' : 'Nueva'} Feria</h3>
                      <form onSubmit={async (e) => { e.preventDefault(); const f = { ...editingFair, id: editingFair.id || Date.now().toString(), status: editingFair.status || 'upcoming' } as Fair; const ok = await (editingFair.id ? updateFair(f) : addFair(f)); if (ok) setEditingFair(null); }} className="space-y-4">
@@ -1928,12 +1931,12 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                        </div>
                        <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditingFair(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
                      </form>
-                   </div></div>
-                 )}
+                   </div></div>,
+                 document.body)}
               </div>
             )}
              {activeTab === 'blog' && (
-               <div className="animate-fade-in-up">
+               <div className="animate-fade-in">
                   <button onClick={() => setEditingBlog({})} className="mb-6 flex items-center gap-2 bg-leather-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-leather-800 transition"><Plus size={20} /> Nuevo Post</button>
                   <div className="grid gap-4">{blogPosts.map(p => (
                     <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white gap-4">
@@ -1944,7 +1947,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                        <div className="flex gap-2"><button onClick={() => setEditingBlog(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded" aria-label={`Editar ${p.title}`}><Edit size={18}/></button><button onClick={() => { if(confirm(`¿Eliminar el post "${p.title}"?`)) deleteBlogPost(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded" aria-label={`Eliminar ${p.title}`}><Trash2 size={18}/></button></div>
                     </div>
                   ))}</div>
-                  {editingBlog && (
+                  {editingBlog && createPortal(
                     <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200 my-8 max-h-[90vh] overflow-y-auto">
                       <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{editingBlog.id ? 'Editar' : 'Nuevo'} Post</h3>
                       <form onSubmit={async (e) => { e.preventDefault(); const b = { ...editingBlog, id: editingBlog.id || Date.now().toString(), author: editingBlog.author || 'Mariela Calistro', excerpt: editingBlog.excerpt || (editingBlog.content || '').substring(0, 150) + '...', date: editingBlog.date || new Date().toLocaleDateString('es-UY', { day: 'numeric', month: 'short', year: 'numeric' }), readTime: editingBlog.readTime || `${Math.max(1, Math.ceil((editingBlog.content || '').split(' ').length / 200))} min lectura` } as BlogPost; const ok = await (editingBlog.id ? updateBlogPost(b) : addBlogPost(b)); if (ok) setEditingBlog(null); }} className="space-y-4">
@@ -1971,12 +1974,12 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                         </div>
                         <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditingBlog(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
                       </form>
-                    </div></div>
-                  )}
+                    </div></div>,
+                  document.body)}
                </div>
              )}
              {activeTab === 'history' && (
-               <div className="animate-fade-in-up">
+               <div className="animate-fade-in">
                   <button onClick={() => setEditingHistory({})} className="mb-6 flex items-center gap-2 bg-leather-900 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-leather-800 transition"><Plus size={20} /> Nuevo Hito</button>
                   <div className="grid gap-4">{history.map(p => (
                     <div key={p.id} className="flex justify-between items-center border border-leather-100 p-4 rounded-lg hover:shadow-md transition bg-white gap-4">
@@ -1984,7 +1987,7 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                        <div className="flex gap-2"><button onClick={() => setEditingHistory(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded" aria-label={`Editar ${p.title}`}><Edit size={18}/></button><button onClick={() => { if(confirm(`¿Eliminar el hito "${p.title}"?`)) deleteHistoryEvent(p.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded" aria-label={`Eliminar ${p.title}`}><Trash2 size={18}/></button></div>
                     </div>
                   ))}</div>
-                  {editingHistory && (
+                  {editingHistory && createPortal(
                     <div className="fixed inset-0 bg-leather-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full border border-leather-200 my-8">
                       <h3 className="text-2xl font-serif font-bold mb-6 text-leather-900">{editingHistory.id ? 'Editar' : 'Nuevo'} Hito</h3>
                       <form onSubmit={async (e) => { e.preventDefault(); const h = { ...editingHistory, id: editingHistory.id || Date.now().toString() } as HistoryEvent; const ok = await (editingHistory.id ? updateHistoryEvent(h) : addHistoryEvent(h)); if (ok) setEditingHistory(null); }} className="space-y-4">
@@ -2006,8 +2009,8 @@ export const INITIAL_CATEGORIES = ${JSON.stringify(categories, null, 2)};
                         </div>
                         <div className="flex justify-end gap-3"><button type="button" onClick={() => setEditingHistory(null)} className="px-6 py-2 text-leather-600 font-bold">Cancelar</button><button type="submit" className="px-6 py-2 bg-leather-900 text-white rounded-lg font-bold">Guardar</button></div>
                       </form>
-                    </div></div>
-                  )}
+                    </div></div>,
+                  document.body)}
                </div>
              )}
           </div>
