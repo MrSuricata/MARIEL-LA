@@ -128,16 +128,19 @@ const ScrollToTop = () => {
 // --- Botón flotante "subir" ---
 const ScrollTopButton = () => {
   const [visible, setVisible] = useState(false);
+  const { pathname } = useLocation();
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 600);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
   if (!visible) return null;
+  // En la ficha de producto (celular) la barra de compra ocupa ese lugar
+  const onProductPage = pathname.startsWith('/producto/');
   return (
     <button
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-      className="fixed bottom-6 left-6 z-40 bg-white text-leather-900 p-3 rounded-full shadow-xl border border-leather-200 hover:bg-leather-50 transition-all hover:scale-110 animate-fade-in-up"
+      className={`fixed bottom-6 left-6 z-40 bg-white text-leather-900 p-3 rounded-full shadow-xl border border-leather-200 hover:bg-leather-50 transition-all hover:scale-110 animate-fade-in-up ${onProductPage ? 'hidden lg:block' : ''}`}
       aria-label="Volver arriba"
     >
       <ArrowUp size={20} />
@@ -496,12 +499,12 @@ const ProductCardSkeleton = ({ tall: _tall = false }: { tall?: boolean }) => (
 // --- Tarjeta de producto (estilo galería) ---
 // La foto es la protagonista: sin caja blanca, texto respirando sobre el fondo,
 // segunda foto al pasar el mouse y la costura de la marca como firma.
-const ProductCard = ({ product, showBadge = true }: { product: Product; showBadge?: boolean }) => {
+const ProductCard = ({ product, showBadge = true, aspect = 'aspect-[4/5]' }: { product: Product; showBadge?: boolean; aspect?: string }) => {
   const { currency, convertPrice, addToCart } = useStore();
   const hasSecond = product.images.length > 1;
   return (
     <div className="group">
-      <Link to={`/producto/${product.id}`} className="block relative aspect-[4/5] rounded-2xl overflow-hidden bg-leather-100/60 shadow-sm transition-shadow duration-500 group-hover:shadow-xl">
+      <Link to={`/producto/${product.id}`} className={`block relative ${aspect} rounded-2xl overflow-hidden bg-leather-100/60 shadow-sm transition-shadow duration-500 group-hover:shadow-xl`}>
         <img
           src={imgSrc(product.images, 600)}
           alt={product.name}
@@ -565,6 +568,41 @@ const BlogCardSkeleton = () => (
   </div>
 );
 
+// --- Cinta de texto en movimiento (identidad de marca) ---
+const MarqueeStrip = () => {
+  const items = ['Hecho a mano en Piriápolis', 'Piezas únicas e irrepetibles', 'Cuero genuino uruguayo', 'Envíos a todo el país', 'Tradición familiar'];
+  const run = (key: string) => (
+    <div key={key} className="flex items-center flex-shrink-0">
+      {items.map((t, i) => (
+        <span key={i} className="flex items-center">
+          <span className="px-6 text-[11px] sm:text-xs uppercase tracking-[0.28em] font-bold text-leather-600 whitespace-nowrap">{t}</span>
+          <span className="text-leather-400 text-xs">✦</span>
+        </span>
+      ))}
+    </div>
+  );
+  return (
+    <div className="marquee overflow-hidden border-y border-leather-200/70 bg-[rgb(var(--paper))] py-3 select-none" aria-hidden="true">
+      <div className="marquee-track">{run('a')}{run('b')}</div>
+    </div>
+  );
+};
+
+// --- Tile narrativa dentro de la grilla del catálogo ---
+const StoryTile = () => (
+  <Link to="/nosotros" className="block break-inside-avoid mb-8 sm:mb-10 group">
+    <div className="relative leather-patch rounded-2xl p-8 aspect-[4/5] flex flex-col items-center justify-center text-center overflow-hidden transition-transform duration-500 group-hover:scale-[1.015]">
+      <div className="absolute inset-3 stitch-border rounded-xl pointer-events-none opacity-90"></div>
+      <Sparkles className="text-leather-100 mb-4 opacity-80 relative z-10" size={22} />
+      <p className="text-stitch font-serif italic text-xl leading-relaxed relative z-10">"No existen dos piezas iguales: la que te enamora, es tuya."</p>
+      <span className="mt-5 text-leather-100/90 text-[11px] uppercase tracking-[0.22em] font-bold relative z-10 border-b border-leather-100/50 pb-1 group-hover:border-leather-100 transition-colors">Conocé a Mariela</span>
+    </div>
+  </Link>
+);
+
+// Ritmo de proporciones para la grilla editorial (evita la grilla uniforme)
+const GRID_ASPECTS = ['aspect-[3/4]', 'aspect-[4/5]', 'aspect-[7/9]', 'aspect-[4/5]', 'aspect-[3/4]', 'aspect-[5/6]'];
+
 // --- Navbar & UI Components ---
 
 const TopBar = () => {
@@ -579,7 +617,11 @@ const TopBar = () => {
   );
 };
 
-const FloatingWhatsApp = () => (
+const FloatingWhatsApp = () => {
+  // En la ficha de producto no se muestra: ahí ya hay barra de compra y botón de consulta propios
+  const { pathname } = useLocation();
+  if (pathname.startsWith('/producto/')) return null;
+  return (
   <a
     href={waLink('¡Hola MARIEL\'LA! Quiero hacerles una consulta 😊')}
     target="_blank"
@@ -592,7 +634,8 @@ const FloatingWhatsApp = () => (
       ¡Escribinos!
     </span>
   </a>
-);
+  );
+};
 
 const Navbar = ({ toggleCart }: { toggleCart: () => void }) => {
   const { cart, isAdmin } = useStore();
@@ -958,6 +1001,7 @@ const HomePage = () => {
   return (
     <div className="animate-fade-in-up">
       <HeroSection />
+      <MarqueeStrip />
       <Reveal><FeaturedCarousel /></Reveal>
       <HowToBuySection />
       <AboutMariela />
@@ -1223,10 +1267,6 @@ const ProductDetail = () => {
   const { showToast } = useToast();
   const [selectedImg, setSelectedImg] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const [showMagnifier, setShowMagnifier] = useState(false);
-  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
-  const [bgPos, setBgPos] = useState({ x: 0, y: 0 });
-  const imgContainerRef = useRef<HTMLDivElement>(null);
 
   const product = products.find(p => p.id === id);
 
@@ -1282,7 +1322,6 @@ const ProductDetail = () => {
     );
   }
 
-  const currentImageUrl = imgSrc(product.images, 1200, selectedImg);
   const highResImageUrl = imgSrc(product.images, 2400, selectedImg);
   const hasMultipleImages = product.images.length > 1;
 
@@ -1290,15 +1329,6 @@ const ProductDetail = () => {
   const relatedProducts = products
     .filter(p => p.category === product.category && p.id !== product.id && !p.isSoldOut)
     .slice(0, 3);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!imgContainerRef.current) return;
-    const { left, top, width, height } = imgContainerRef.current.getBoundingClientRect();
-    const x = e.clientX - left;
-    const y = e.clientY - top;
-    setCursorPos({ x, y });
-    setBgPos({ x: (x / width) * 100, y: (y / height) * 100 });
-  };
 
   const productUrl = `${window.location.origin}/producto/${product.id}`;
   const consultUrl = waLink(`¡Hola MARIEL'LA! Me interesa esta pieza: ${product.name} — ${productUrl}`);
@@ -1317,62 +1347,97 @@ const ProductDetail = () => {
 
   return (
     <>
-      <div className="bg-white min-h-screen pt-36 pb-12 animate-fade-in-up">
+      <div className="bg-white min-h-screen pt-32 pb-28 lg:pb-16 animate-fade-in-up">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-24">
-            <div className="space-y-6">
-              <div ref={imgContainerRef} className={`relative aspect-square bg-leather-50 rounded-2xl overflow-hidden border border-leather-100 shadow-sm group ${showMagnifier ? 'cursor-none' : 'cursor-zoom-in'}`} onMouseEnter={() => setShowMagnifier(true)} onMouseLeave={() => setShowMagnifier(false)} onMouseMove={handleMouseMove} onClick={() => setIsLightboxOpen(true)}>
-                <img src={currentImageUrl} alt={product.name} className="w-full h-full object-cover" onError={handleImgError} />
-                {showMagnifier && (
-                  <div className="absolute w-40 h-40 rounded-full border-4 border-white shadow-2xl pointer-events-none z-20 overflow-hidden hidden md:block" style={{ left: cursorPos.x, top: cursorPos.y, transform: 'translate(-50%, -50%)', backgroundImage: `url(${highResImageUrl})`, backgroundRepeat: 'no-repeat', backgroundPosition: `${bgPos.x}% ${bgPos.y}%`, backgroundSize: '500%' }} />
-                )}
-                <div className="absolute top-4 right-4 bg-white/80 backdrop-blur p-2 rounded-full text-leather-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"><Maximize2 size={20} /></div>
+          {/* Miga de pan */}
+          <nav className="mb-8 text-[13px] font-medium text-leather-400 flex items-center gap-2 flex-wrap" aria-label="Ruta de navegación">
+            <Link to="/catalogo" className="hover:text-leather-700 transition-colors">Tienda</Link>
+            <span aria-hidden="true">/</span>
+            <span>{product.category}</span>
+            <span aria-hidden="true">/</span>
+            <span className="text-leather-700">{product.name}</span>
+          </nav>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-16 mb-24 items-start">
+            {/* Galería: fotos grandes en columna (desktop) / carrusel con snap (celular) */}
+            <div>
+              <div className="hidden lg:flex flex-col gap-5">
+                {(product.images.length > 0 ? product.images : ['']).map((_, idx) => (
+                  <button key={idx} onClick={() => { setSelectedImg(idx); setIsLightboxOpen(true); }} className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-leather-100/60 cursor-zoom-in group block w-full" aria-label={`Ampliar foto ${idx + 1} de ${product.name}`}>
+                    <img src={imgSrc(product.images, 1200, idx)} alt={`${product.name} — foto ${idx + 1}`} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" loading={idx === 0 ? 'eager' : 'lazy'} onError={handleImgError} />
+                    <div className="absolute top-4 right-4 bg-white/85 backdrop-blur p-2 rounded-full text-leather-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"><Maximize2 size={18} /></div>
+                  </button>
+                ))}
               </div>
-              {hasMultipleImages && (
-                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                  {product.images.map((img, idx) => (
-                    <button key={idx} onClick={() => setSelectedImg(idx)} aria-label={`Ver foto ${idx + 1}`} className={`w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${selectedImg === idx ? 'border-leather-600 ring-2 ring-leather-100' : 'border-transparent opacity-70 hover:opacity-100'}`}><img src={processImageUrl(img, 200)} alt="" className="w-full h-full object-cover" onError={handleImgError} /></button>
+              <div className="lg:hidden">
+                <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
+                  {(product.images.length > 0 ? product.images : ['']).map((_, idx) => (
+                    <button key={idx} onClick={() => { setSelectedImg(idx); setIsLightboxOpen(true); }} className="snap-center flex-shrink-0 w-[86%] relative aspect-[4/5] rounded-2xl overflow-hidden bg-leather-100/60" aria-label={`Ampliar foto ${idx + 1} de ${product.name}`}>
+                      <img src={imgSrc(product.images, 1000, idx)} alt={`${product.name} — foto ${idx + 1}`} className="absolute inset-0 w-full h-full object-cover" loading={idx === 0 ? 'eager' : 'lazy'} onError={handleImgError} />
+                    </button>
                   ))}
                 </div>
-              )}
+                {hasMultipleImages && <p className="mt-3 text-center text-xs text-leather-400 font-medium">{product.images.length} fotos — deslizá para verlas, tocá para ampliar</p>}
+              </div>
             </div>
-            <div className="flex flex-col justify-center">
+
+            {/* Panel de información: acompaña el scroll en desktop */}
+            <div className="lg:sticky lg:top-32">
               <div className="mb-6">
                  <div className="flex items-center justify-between gap-4 flex-wrap">
                    <div className="flex items-center gap-3 flex-wrap">
-                     <span className="text-leather-600 font-bold uppercase tracking-wider text-sm">{product.category}</span>
                      <span className="inline-flex items-center gap-1 bg-leather-50 border border-leather-200 text-leather-700 text-xs font-bold px-3 py-1 rounded-full"><Sparkles size={12} /> Pieza única hecha a mano</span>
                    </div>
                    <button onClick={handleShare} className="flex items-center gap-1 text-leather-400 hover:text-leather-700 transition-colors text-sm font-bold" aria-label="Compartir producto"><Share2 size={16} /> Compartir</button>
                  </div>
-                 <h1 className="text-4xl md:text-5xl font-serif font-bold text-leather-900 mt-2 mb-4">{product.name}</h1>
+                 <h1 className="text-4xl xl:text-5xl font-serif font-bold text-leather-900 mt-3 mb-5 leading-[1.08] text-balance">{product.name}</h1>
                  <div className="flex items-center gap-4 flex-wrap">
                    <p className="text-3xl font-light text-leather-800 font-serif">{formatPrice(convertPrice(product.priceUYU), currency)}</p>
                    <CurrencyToggle />
                  </div>
               </div>
-              <div className="prose prose-lg text-leather-800 mb-10 leading-relaxed font-medium"><p>{product.description}</p></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 p-6 bg-leather-50 rounded-xl border border-leather-100">
-                <div><span className="font-bold text-leather-900 block mb-2">Materiales</span><ul className="text-sm text-leather-800 space-y-1">{product.materials.map(m => <li key={m} className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-leather-500"></div>{m}</li>)}</ul></div>
-                <div><span className="font-bold text-leather-900 block mb-2">Detalles</span>{product.dimensions && <p className="text-sm text-leather-800 mb-2"><span className="font-semibold">Medidas:</span> {product.dimensions}</p>}{product.colors.length > 0 && <p className="text-sm text-leather-800"><span className="font-semibold">Colores:</span> {product.colors.join(', ')}</p>}</div>
+              <div className="text-leather-800 mb-8 leading-relaxed font-medium text-[15px]"><p>{product.description}</p></div>
+              <div className="mb-8 border-y border-leather-100 divide-y divide-leather-100">
+                {product.materials.length > 0 && (
+                  <div className="flex gap-6 py-3.5">
+                    <span className="w-24 flex-shrink-0 text-[11px] uppercase tracking-[0.14em] font-bold text-leather-500 pt-0.5">Materiales</span>
+                    <span className="text-sm text-leather-800 font-medium">{product.materials.join(' · ')}</span>
+                  </div>
+                )}
+                {product.dimensions && (
+                  <div className="flex gap-6 py-3.5">
+                    <span className="w-24 flex-shrink-0 text-[11px] uppercase tracking-[0.14em] font-bold text-leather-500 pt-0.5">Medidas</span>
+                    <span className="text-sm text-leather-800 font-medium">{product.dimensions}</span>
+                  </div>
+                )}
+                {product.colors.length > 0 && (
+                  <div className="flex gap-6 py-3.5">
+                    <span className="w-24 flex-shrink-0 text-[11px] uppercase tracking-[0.14em] font-bold text-leather-500 pt-0.5">Colores</span>
+                    <span className="text-sm text-leather-800 font-medium">{product.colors.join(', ')}</span>
+                  </div>
+                )}
               </div>
               {product.isSoldOut ? (
                 <div className="space-y-4">
-                  <div className="w-full bg-red-50 text-red-700 px-8 py-5 rounded-lg font-bold text-lg text-center border border-red-200">Esta pieza ya encontró su dueño 💛</div>
-                  <a href={encargoUrl} target="_blank" rel="noopener noreferrer" className="w-full bg-leather-900 text-white px-8 py-5 rounded-lg font-bold text-lg hover:bg-leather-800 transition shadow-lg flex items-center justify-center gap-2">
+                  <div className="w-full bg-leather-50 text-leather-800 px-8 py-5 rounded-xl font-serif italic text-lg text-center border border-leather-200">Esta pieza ya encontró su dueño 💛</div>
+                  <a href={encargoUrl} target="_blank" rel="noopener noreferrer" className="w-full bg-leather-900 text-white px-8 py-5 rounded-xl font-bold text-lg hover:bg-leather-800 transition shadow-lg flex items-center justify-center gap-2">
                     <MessageCircle size={22} className="fill-white" /> Pedir una similar por encargue
                   </a>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <button onClick={() => addToCart(product)} className="w-full bg-leather-900 text-white px-8 py-5 rounded-lg font-bold text-lg hover:bg-leather-800 transition shadow-lg transform active:scale-95 flex items-center justify-center gap-2">
+                  <button onClick={() => addToCart(product)} className="w-full bg-leather-900 text-white px-8 py-5 rounded-xl font-bold text-lg hover:bg-leather-800 transition shadow-lg transform active:scale-[0.98] flex items-center justify-center gap-2">
                     <ShoppingBag size={22} /> Agregar al Carrito
                   </button>
-                  <a href={consultUrl} target="_blank" rel="noopener noreferrer" className="w-full border-2 border-[#25D366] text-[#128C7E] px-8 py-4 rounded-lg font-bold hover:bg-[#25D366]/10 transition flex items-center justify-center gap-2">
+                  <a href={consultUrl} target="_blank" rel="noopener noreferrer" className="w-full border-2 border-[#25D366] text-[#128C7E] px-8 py-4 rounded-xl font-bold hover:bg-[#25D366]/10 transition flex items-center justify-center gap-2">
                     <MessageCircle size={20} /> Consultar por WhatsApp
                   </a>
                 </div>
               )}
+              <div className="mt-8 flex items-center gap-x-5 gap-y-2 text-[12px] text-leather-500 font-medium flex-wrap">
+                <span className="flex items-center gap-1.5"><Hammer size={13} /> Hecha a mano en Piriápolis</span>
+                <span className="flex items-center gap-1.5"><Truck size={13} /> Envíos a todo el país</span>
+              </div>
             </div>
           </div>
 
@@ -1389,6 +1454,17 @@ const ProductDetail = () => {
           )}
         </div>
       </div>
+      {/* Barra de compra fija (solo celular) — fuera del contenedor animado
+          para que position:fixed se ancle al viewport y no al transform */}
+      {!product.isSoldOut && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-leather-100 px-4 pt-3 flex items-center gap-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+          <div className="flex-1 min-w-0">
+            <span className="block text-[13px] font-bold text-leather-900 truncate">{product.name}</span>
+            <span className="text-leather-700 font-bold text-sm">{formatPrice(convertPrice(product.priceUYU), currency)}</span>
+          </div>
+          <button onClick={() => addToCart(product)} className="flex-shrink-0 bg-leather-900 text-white px-5 py-3 rounded-xl font-bold text-sm flex items-center gap-2 active:scale-95 transition"><ShoppingBag size={17} /> Agregar</button>
+        </div>
+      )}
       {isLightboxOpen && (
         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4" onClick={() => setIsLightboxOpen(false)} role="dialog" aria-modal="true" aria-label={`Foto de ${product.name}`}>
           <button className="absolute top-6 right-6 text-white/70 hover:text-white p-2 z-10" aria-label="Cerrar"><X size={32} /></button>
@@ -1971,39 +2047,49 @@ const CatalogPage = () => {
   return (
     <div className="pt-36 pb-24 bg-leather-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4">
-        <h1 className="text-4xl font-serif font-bold text-leather-900 mb-8 text-center">Nuestra Colección</h1>
+        {/* Encabezado editorial */}
+        <div className="mb-10">
+          <span className="text-leather-600 uppercase tracking-[0.22em] text-xs font-bold">La tienda</span>
+          <h1 className="mt-2 font-serif font-bold text-leather-900 text-5xl sm:text-6xl leading-[1.02] text-balance">Nuestra <em className="italic text-leather-600">Colección</em></h1>
+          <p className="mt-4 text-leather-600 font-medium max-w-xl">Cada pieza sale una sola vez del taller de Mariela. Cuando encuentra dueño, no se repite.</p>
+        </div>
+      </div>
 
-        {/* Search Input */}
-        <div className="max-w-md mx-auto mb-8 relative">
-          <input
-            type="text"
-            placeholder="Buscar por nombre o descripción..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-10 py-3 rounded-full border border-leather-200 focus:border-leather-900 focus:ring-2 focus:ring-leather-100 transition-all outline-none shadow-sm"
-            aria-label="Buscar productos"
-          />
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-leather-400" size={20} />
-          {searchTerm && (
-            <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-leather-400 hover:text-leather-600" aria-label="Borrar búsqueda">
-              <XCircle size={18} />
-            </button>
+      <MarqueeStrip />
+
+      <div className="max-w-7xl mx-auto px-4 pt-10">
+        {/* Toolbar: búsqueda + categorías */}
+        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 mb-4">
+          <div className="relative w-full md:max-w-xs flex-shrink-0">
+            <input
+              type="text"
+              placeholder="Buscar una pieza..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-10 py-2.5 rounded-full border border-leather-200 focus:border-leather-900 focus:ring-2 focus:ring-leather-100 transition-all outline-none shadow-sm text-sm"
+              aria-label="Buscar productos"
+            />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-leather-400" size={17} />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-leather-400 hover:text-leather-600" aria-label="Borrar búsqueda">
+                <XCircle size={17} />
+              </button>
+            )}
+          </div>
+          {categories.length > 0 && (
+            <div className="flex flex-wrap gap-2.5">
+              {categories.map(cat => (
+                <button key={cat} onClick={() => setFilter(cat)} aria-pressed={filter === cat} className={`px-5 py-2 rounded-full font-bold text-sm transition-all border ${filter === cat ? 'bg-leather-900 text-white border-leather-900' : 'bg-white text-leather-900 border-leather-200 hover:border-leather-900'}`}>
+                  {cat}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
-        {categories.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-3 mb-8">
-            {categories.map(cat => (
-              <button key={cat} onClick={() => setFilter(cat)} aria-pressed={filter === cat} className={`px-6 py-2 rounded-full font-bold transition-all border ${filter === cat ? 'bg-leather-900 text-white border-leather-900' : 'bg-white text-leather-900 border-leather-200 hover:border-leather-900'}`}>
-                {cat}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Contador + Orden */}
         {!loading && (
-          <div className="flex justify-between items-center mb-8 max-w-7xl mx-auto flex-wrap gap-3">
+          <div className="flex justify-between items-center mb-10 flex-wrap gap-3">
             <p className="text-leather-500 font-medium text-sm">{sorted.length} {sorted.length === 1 ? 'pieza' : 'piezas'}</p>
             <div className="flex items-center gap-3">
               <CurrencyToggle />
@@ -2023,14 +2109,23 @@ const CatalogPage = () => {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-10 sm:gap-x-7">
-            {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+          <div className="columns-2 lg:columns-3 gap-5 sm:gap-7">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="break-inside-avoid mb-8 sm:mb-10"><ProductCardSkeleton /></div>
+            ))}
           </div>
         ) : sorted.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-10 sm:gap-x-7 sm:gap-y-12">
-            {sorted.map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+          <div className="columns-2 lg:columns-3 gap-5 sm:gap-7">
+            {(() => {
+              const nodes = sorted.map((product, i) => (
+                <div key={product.id} className="break-inside-avoid mb-8 sm:mb-10">
+                  <ProductCard product={product} aspect={GRID_ASPECTS[i % GRID_ASPECTS.length]} />
+                </div>
+              ));
+              // La tile con la historia de Mariela se mezcla entre las piezas
+              if (sorted.length >= 3) nodes.splice(2, 0, <StoryTile key="story-tile" />);
+              return nodes;
+            })()}
           </div>
         ) : (
           <div className="text-center py-20">

@@ -149,6 +149,21 @@ html {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* Cinta de texto en movimiento (marquee) */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 30s linear infinite;
+}
+.marquee:hover .marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+
 .leather-patch {
   background-color: rgb(var(--leather-800));
   box-shadow: 0 10px 20px rgba(0,0,0,0.4), inset 0 0 40px rgba(0,0,0,0.2);
